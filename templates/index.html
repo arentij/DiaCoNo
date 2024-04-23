@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CMFX</title>
+    <link rel="shortcut icon" href="{{ url_for('static', filename='favicon.ico') }}">
+</head>
+
+
+<script>
+    var nIntervId;
+
+    function StartUpdating() {
+      nIntervId = setInterval(update_page, 999);
+    }
+
+    function update_page() {
+
+        $.getJSON($SCRIPT_ROOT + '/return_one',
+        {a1:1, b1:1},
+        function(data) {
+            $("#time_box").text(data.time);
+            d = new Date();
+
+<!--            $("#all_plot").attr("src", "static/camphoto.jpg?"+d.getTime());-->
+            $("#all_plot2").attr("src", "static/camphoto2.jpg?"+d.getTime());
+
+
+
+        });
+    }
+</script>
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+
+<script>window.jQuery || document.write('<script src="{{
+  url_for('static', filename='jquery.js') }}">\x3C/script>')</script>
+<script type=text/javascript>  $SCRIPT_ROOT = {{ request.script_root|tojson }};</script>
+
+
+<body onload="StartUpdating();">
+Time: <span id=time_box>0</span>
+
+
+<!--<div class="column">-->
+<!--&lt;!&ndash;    <img id="all_plot" src="static/camphoto.jpg"   style="width:50%; left: 0;"/>&ndash;&gt;-->
+<!--&lt;!&ndash;    <img id="all_plot_pressure" src="static/camphoto.jpg"   style="width:100%; left: 0;"/>&ndash;&gt;-->
+<!--</div>-->
+
+<div class="column">
+    <img id="all_plot2" src="static/camphoto2.jpg"   style="width:50%; left: 0;"/>
+<!--    <img id="all_plot_pressure" src="static/camphoto.jpg"   style="width:100%; left: 0;"/>-->
+</div>
+<!--<div class="column">-->
+<!--    <img id="short_plot" src="static/camphoto.jpgg"   style="width:100%; "/>-->
+<!--    <img id="short_plot_pressure" src="static/camphoto.jpg"   style="width:100%; "/>-->
+<!--</div>-->
+<!--    Timescale <input type="number" id="torque_scale" name="torque_time_form" min="0" max="100" size=3 step="1" >, min-->
+<!--    <input type="button" value="Set" onclick = "adjust_plots('adjust_temperature')">-->
+<!--</div>-->
+
+</body>
+</html>
