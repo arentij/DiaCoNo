@@ -4,8 +4,8 @@ import time
 
 import pyudev
 import cv2
-import os
 import threading
+from folder_manager import Folder, check_create_folder
 
 import random
 
@@ -180,53 +180,6 @@ class Camera:
         return threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
 
 
-class Folder:
-    def __init__(self):
-        self.discharge = False
-        self.exp_n = 0
-
-        self.base_folder = "/CMFX_RAW/tests/"
-
-        self.video_folder = f"{self.base_folder}video/"
-        self.spectrometer_folder = f"{self.base_folder}spectrometer/"
-        self.interferometer_folder = f"{self.base_folder}interferometer/"
-        self.image_folder = f"{self.base_folder}image/"
-
-        self.create_folders()
-
-    def create_folders(self, dsc=0, n=0):
-        if dsc == 1:
-            self.base_folder = "/CMFX_RAW/"
-            now_str = ''
-        else:
-            now_str= f"_{datetime.datetime.now().strftime('%y%m%d_%H%M%S')}"
-            now_str = ''
-        today_str = f"_{datetime.datetime.now().strftime('%y%m%d_%H%M%S')}"
-        self.video_folder = f"{self.base_folder}video/exp{n}{now_str}"
-        check_create_folder(self.video_folder)
-        self.spectrometer_folder = f"{self.base_folder}spectrometer/exp{n}{now_str}"
-        check_create_folder(self.spectrometer_folder)
-        self.interferometer_folder= f"{self.base_folder}interferometer/exp{n}{now_str}"
-        check_create_folder(self.interferometer_folder)
-        self.image_folder = f"{self.base_folder}image/img{now_str}"
-        check_create_folder(self.image_folder)
-
-        return True
-
-    def update_folders(self, dsc=0, n=0):
-        self.create_folders(dsc, n)
-        return True
-
-
-def check_create_folder(path):
-    if not os.path.exists(path):
-        try:
-            os.makedirs(path)
-            print(f"Folder '{path}' created.")
-        except OSError as e:
-            print(f"Failed to create folder '{path}': {e}")
-    else:
-        print(f"Folder '{path}' already exists.")
 
 
 if __name__ == "__main__":
@@ -234,12 +187,15 @@ if __name__ == "__main__":
 
     time_before = datetime.datetime.now()
     working_cameras = []
-    for camera in list_usb_cameras():
-        if camera['openable']:
 
-            # print(f"Name: {camera['name']}, Vendor: {camera['vendor']}, Serial: {camera['serial']}")
-            # print(f"Bus: {camera['bus']}, Vendor ID: {camera['vendor_id']}, Model ID: {camera['model_id']}")
-            # print(f"PATH: {camera['path']}, Openable: {camera['openable']}")
+
+    for camera in list_usb_cameras():
+        print(f"Name: {camera['name']}, Vendor: {camera['vendor']}, Serial: {camera['serial']}")
+        print(f"Bus: {camera['bus']}, Vendor ID: {camera['vendor_id']}, Model ID: {camera['model_id']}")
+        print(f"PATH: {camera['path']}, Openable: {camera['openable']}")
+
+        if camera['openable']:
+            continue
 
             working_cameras.append(Camera(camera['path'], f"{camera['vendor_id']}:{camera['model_id']}"))
 
