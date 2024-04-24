@@ -2,6 +2,7 @@ import datetime
 import os
 import pandas as pd
 
+
 class Folder:
     def __init__(self):
         self.discharge = False
@@ -79,3 +80,4 @@ def save_results_to_parquet(results_columns, filename):
 
     # Save DataFrame to Parquet file
     results_columns.to_parquet(filename, index=False)
+    print(f"File: {filename} was written at {datetime.datetime.now().strftime('%y%m%d_%H%M%S')}")

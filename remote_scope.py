@@ -211,7 +211,7 @@ class Oscilloscope:
 
             # results = [getattr(self, variable) for variable in scope_columns if hasattr(self, variable)]
             scope_filename = f"{current_folders.interferometer_folder}CMFX_{n:05d}_scope.parquet"
-            print(scope_filename)
+            # print(scope_filename)
             save_results_to_parquet(results_df, scope_filename)
         except Exception as e:
             print(e)

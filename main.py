@@ -133,6 +133,10 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Something went wrong with the scope during reading and writing: {e}")
 
-
+            try:
+                True
+                # print("spectrometer hehe")
+            except Exception as e:
+                print(f"Something went wrong with the spectrometer during reading and writing: {e}")
 
         time.sleep(0.001)
