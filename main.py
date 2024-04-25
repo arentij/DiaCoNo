@@ -11,7 +11,7 @@ import serial
 from trigger_setup import Trigger
 from remote_scope import Oscilloscope
 from folder_manager import *
-
+from spectrometer_USB import *
 import numpy
 from seabreeze.spectrometers import Spectrometer, list_devices
 from setting_loggers import *
@@ -39,6 +39,10 @@ def arm_diagnostics():
 
 
 
+# @app.route('/status')
+# def status():
+#     return jsonify(scope=checker.statuses[0], spectr=checker.statuses[1], N_exp=checker.statuses[2], trigger=checker.statuses[3], wrote=checker.statuses[4])
+
 def run_web_app():
     app.run(host='0.0.0.0', port=80)
 
@@ -49,19 +53,64 @@ class Experiment:
         self.exp_number = n
         self.time_of_exp = datetime.datetime.now()
         self.charging = False
-
+        self.armed = False
+        trigger.triggered = False
 
 def update_diagnostics(dsc=0, n=0):
     # here we need to define saving folders, files, check if the devices are ready
     # updating save folders
+    before = datetime.datetime.now()
+
     current_folders.update_folders(dsc, n)
     current_experiment.exp_number = n
     current_experiment.discharge = dsc
+    current_experiment.armed = True
+
+    for spectrometer in spectrometers:
+        spectrometer.triggered = False
+
+        spectrometer.setup_worker(current_experiment.discharge, current_experiment.exp_number, current_folders.spectrometer_folder)
+        spectrometer.worker.start()
+        print(f"Spectrometer worker started")
+
     # for scope in scopes:
     #     # scope.runNumber = last_experiment.exp_number
     #     # scope.dsc = dsc
     #     print(f"arm diagnostics N={last_experiment.exp_number}")
+    after = datetime.datetime.now()
+    print(f"Updating experiment took {(after - before).total_seconds()} s")
     return True
+
+
+class Checker:
+    def __init__(self, scope, spectrometer, experiment, trigger):
+        self.active = False
+        self.worker = threading.Thread()
+
+        self.scope = scope
+        self.spectrometer = spectrometer
+        self.experiment = experiment
+        self.trigger = trigger
+
+        self.statuses = [0, 0, 0, 0, 1]
+
+    def running_and_checking(self):
+        if self.scope.connected:
+            self.statuses[0] = 1
+        else:
+            self.statuses[0] = 0
+        if self.spectrometer.connected:
+            self.statuses[1] = 1
+        else:
+            self.statuses[1] = 0
+        self.statuses[2] = self.experiment.exp_number
+
+        if self.trigger.triggered:
+            self.statuses[3] = 1
+        else:
+            self.statuses[3] = 0
+        print(f"Statuses: {self.statuses}")
+        time.sleep(3)
 
 
 if __name__ == "__main__":
@@ -88,9 +137,17 @@ if __name__ == "__main__":
 
 
     scope_DHO4204 = Oscilloscope()
-
     scopes = [scope_DHO4204]
 
+    usb_spec2000 = USB_spectrometer(integ_time=3000, max_time=0.5)
+    spectrometers = [usb_spec2000]
+    usb_spec2000.connect.start()
+
+    # usb_spec2000.search_device_worker.start()
+
+    # while True:
+    #     time.sleep(5)
+    #     print(5)
     time.sleep(1)
     scope_DHO4204.reset()
 
@@ -103,33 +160,44 @@ if __name__ == "__main__":
                      'ACC02': {'name': 'ACC02 (V)', 'type': 'array'}}
     #
 
-    update_diagnostics(dsc=0, n=0)
+    time.sleep(3)
+    update_diagnostics(dsc=0, n=1)
     # print(f"Current folder 1 interf={current_folders.interferometer_folder}")
 
+    checker = Checker(scope_DHO4204, usb_spec2000, current_experiment, trigger)
+    checker.worker.start()
+
     while True:
+        # if not current_experiment.armed and trigger.triggered:  # meaning the trigger happened while exp was not armed
+        #     trigger.triggered = False
+        # print(f"Triggered = {trigger.triggered}")
         now = datetime.datetime.now()
         if trigger.time_to_clear:
             scope_DHO4204.reset()
             trigger.time_to_clear = False
+        # print(f"Spectrometer status triggered = {usb_spec2000.triggered}")
+        if trigger.triggered and current_experiment.armed:
+            # First let everyone know that the trigger event happened
+            usb_spec2000.triggered = True
+            checker.statuses[4] = 0
+            # Now let's deal with the rest of this hell (oscilloscope)
 
-        if trigger.triggered:
             # print(f"Current folder 2 interf={current_folders.interferometer_folder}")
             # current_folders.update_folders()
-            print(f"The scope was triggered at {trigger.last_time_triggered.strftime('%Y%m%d-%H%M%S')}")
+            print(f"The app was triggered at {trigger.last_time_triggered.strftime('%Y%m%d-%H%M%S')}")
             # let's write the moment of the trigger to the experiment object
             current_experiment.time_of_exp = trigger.last_time_triggered
             # now it's time to save the data
             print("time to sleep and wait for the scope to record data")
-            time.sleep(2)
+            time.sleep(28)
             try:
+                print(f"Time to read the scope")
                 # scope_DHO4204.set_runNumber(last_experiment.exp_number)
                 scope_DHO4204.create_worker(scope_columns, current_folders, current_experiment)
                 scope_DHO4204.read_and_write_worker.start()
-
                 # These results are listed in accordance with the 'columns' variable in constants.py
                 # If the user would like to add or remove fields please make those changes in constant.py
 
-                trigger.triggered = False
             except Exception as e:
                 print(f"Something went wrong with the scope during reading and writing: {e}")
 
@@ -139,4 +207,6 @@ if __name__ == "__main__":
             except Exception as e:
                 print(f"Something went wrong with the spectrometer during reading and writing: {e}")
 
+            trigger.triggered = False
+            current_experiment.armed = False
         time.sleep(0.001)

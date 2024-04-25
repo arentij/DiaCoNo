@@ -5,13 +5,14 @@ import numpy as np
 from tqdm import tqdm
 import threading
 from folder_manager import *
+# from main import checker
 class Oscilloscope:
     def __init__(self, channels={'INT01': '1', 'INT01_DRIVER': '2', 'INT02': '3', 'INT02_DRIVER': '4'}, nPoints=None, memoryDepth='1M', auto_reset=False, reaching_point='TCPIP::169.254.146.112::INSTR'):
         self.channels = channels
         self.nPoints = nPoints
         self.memoryDepth = memoryDepth
         self.data = {}
-
+        self.connected = False
         self.busy = False
 
         # self.dsc = 0
@@ -28,14 +29,21 @@ class Oscilloscope:
         if auto_reset:
             self.reset()
             # self.busy = False
-
-        print('Oscilloscope has been initialized successfully.')
+        if self.connected:
+            print('Oscilloscope has been initialized successfully.')
 
     def connectInstrument(self):
         # USB connection, COM port is static
         # instrumentName = self.findIPAddress()
-        self.inst = self.rm.open_resource(self.address, timeout=1000, chunk_size=100000, encoding='latin-1')
-        # self.inst = self.rm.open_resource('TCPIP::192.168.1.2::INSTR') # bigger timeout for long mem
+        try:
+            self.inst = self.rm.open_resource(self.address, timeout=1000, chunk_size=100000, encoding='latin-1')
+            # self.inst = self.rm.open_resource('TCPIP::192.168.1.2::INSTR') # bigger timeout for long mem
+            self.connected = True
+        except Exception as e:
+            print("Couldn't connect to the scope")
+            self.connected = False
+            time.sleep(1)
+            return False
         return True
     def findIPAddress(self):
         resources = self.rm.list_resources()
@@ -44,36 +52,41 @@ class Oscilloscope:
 
     # stop reading data
     def reset(self):
+        if self.connected:
         # Reset the internal memory depth
-        try:
-            self.inst.write(':RUN')
-            # self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
-            # self.inst.write(f'ACQ:MDEP AUTO')
+        # if self.co
+            try:
+                self.inst.write(':RUN')
+                # self.inst.write(f'ACQ:MDEP {self.memoryDepth}')
+                # self.inst.write(f'ACQ:MDEP AUTO')
 
-            self.inst.write(':CLE') # clear all waveforms from screen
-            self.inst.write(':STOP') # stop running scope
-            self.inst.write(':SING') # setup for single trigger event
+                self.inst.write(':CLE') # clear all waveforms from screen
+                self.inst.write(':STOP') # stop running scope
+                self.inst.write(':SING') # setup for single trigger event
 
-            self.readSuccess = False
-        except pyvisa.errors.VisaIOError as e:
-            print(f"Couldn't reset the scope due to: {e}")
-            time.sleep(0.2)
+                self.readSuccess = False
+            except pyvisa.errors.VisaIOError as e:
+                print(f"Couldn't reset the scope due to: {e}")
+                time.sleep(0.2)
 
-        self.busy = False
+            self.busy = False
     # def set_runNumber(self, runNumber):
     #     self.runNumber = runNumber
 
     def read_scope(self):
-        while self.busy:
-            time.sleep(0.1)
-            print("the scope is still busy")
+        if self.connected:
+            while self.busy:
+                time.sleep(0.1)
+                print("the scope is still busy")
+            else:
+                for channel_name in self.channels:
+                    self.get_data(channel_name)
+                if self.readSuccess:
+                    self.get_time()
+                self.busy = False
+            return True
         else:
-            for channel_name in self.channels:
-                self.get_data(channel_name)
-            if self.readSuccess:
-                self.get_time()
-            self.busy = False
-
+            return False
     def get_data(self, channel_name):
         channel = self.channels[channel_name]
         try:
@@ -194,31 +207,34 @@ class Oscilloscope:
         return (self.time, self.tUnit)
 
     def read_data_and_write_file(self, n, scope_columns, current_folders):
+        if self.connected:
+            print('Attempting reading data and writing the osc file')
+            print(f"N={n}")
+            self.read_scope()
 
-        print('Attempting reading data and writing the osc file')
-        print(f"N={n}")
-        self.read_scope()
+            try:
+                results = [getattr(self, variable) for variable in scope_columns if
+                           hasattr(self, variable)]
 
-        try:
-            results = [getattr(self, variable) for variable in scope_columns if
-                       hasattr(self, variable)]
+                # Creates a data frame which is easier to save to csv formats
+                results_df = pd.concat([pd.Series(val) for val in results], axis=1)
+                results_df.columns = [scope_columns[variable]['name'] for variable in scope_columns if
+                                      hasattr(self, variable)]
+                # results_df.to_parquet(f'{saveFolder}/{runDate}/{scope_filename}', index=False)
 
-            # Creates a data frame which is easier to save to csv formats
-            results_df = pd.concat([pd.Series(val) for val in results], axis=1)
-            results_df.columns = [scope_columns[variable]['name'] for variable in scope_columns if
-                                  hasattr(self, variable)]
-            # results_df.to_parquet(f'{saveFolder}/{runDate}/{scope_filename}', index=False)
+                # results = [getattr(self, variable) for variable in scope_columns if hasattr(self, variable)]
+                scope_filename = f"{current_folders.interferometer_folder}CMFX_{n:05d}_scope.parquet"
+                # print(scope_filename)
+                save_results_to_parquet(results_df, scope_filename)
+                # checker.statuses[4] = 1
+            except Exception as e:
+                print(e)
 
-            # results = [getattr(self, variable) for variable in scope_columns if hasattr(self, variable)]
-            scope_filename = f"{current_folders.interferometer_folder}CMFX_{n:05d}_scope.parquet"
-            # print(scope_filename)
-            save_results_to_parquet(results_df, scope_filename)
-        except Exception as e:
-            print(e)
+            print(self.address)
 
-        print(self.address)
-
-        return True
+            return True
+        else:
+            return False
 
     def create_worker(self, scope_columns, current_folders, current_experiment):
         self.read_and_write_worker = threading.Thread(target=self.read_data_and_write_file, args=(current_experiment.exp_number, scope_columns, current_folders))

@@ -15,6 +15,9 @@ class Trigger:
 
         # self.arduino_port = '/dev/ttyACM1'
         self.arduino_port = '/dev/myArduino1'
+        # self.arduino_port = '/dev/myArduino2'
+        # self.arduino_port = 'ttyUSB0'
+
         self.arduino_baudrate = 1000000
 
         self.connect()
