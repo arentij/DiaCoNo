@@ -15,6 +15,8 @@ from spectrometer_USB import *
 import numpy
 from seabreeze.spectrometers import Spectrometer, list_devices
 from setting_loggers import *
+from cameras_read import *
+
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -74,6 +76,12 @@ def update_diagnostics(dsc=0, n=0):
         spectrometer.setup_worker(current_experiment.discharge, current_experiment.exp_number, current_folders.spectrometer_folder)
         spectrometer.worker.start()
         print(f"Spectrometer worker started")
+
+    for working_usb_cam_n in working_cameras:
+        working_usb_cam_n.triggered = False
+        working_usb_cam_n.setup_worker(current_folders)
+        working_usb_cam_n.running_worker.start()
+        print(f"Camera {working_usb_cam_n.path} started ")
 
     # for scope in scopes:
     #     # scope.runNumber = last_experiment.exp_number
@@ -163,12 +171,35 @@ if __name__ == "__main__":
     #
 
     time.sleep(3)
-    update_diagnostics(dsc=0, n=1)
+    # working_cameras = []
+    # update_diagnostics(dsc=0, n=1)
     # print(f"Current folder 1 interf={current_folders.interferometer_folder}")
 
     checker = Checker(scope_DHO4204, usb_spec2000, current_experiment, trigger)
     # checker.worker.start()
 
+    # Now cameras
+    time_before_cams = datetime.datetime.now()
+    working_cameras = []
+    for camera in list_usb_cameras():
+        # print(f"Name: {camera['name']}, Vendor: {camera['vendor']}, Serial: {camera['serial']}")
+        # print(f"Bus: {camera['bus']}, Vendor ID: {camera['vendor_id']}, Model ID: {camera['model_id']}")
+        # print(f"PATH: {camera['path']}, Openable: {camera['openable']}")
+        if camera['openable']:
+            working_cameras.append(Camera(camera['path'], f"{camera['vendor_id']}:{camera['model_id']}"))
+
+    for working_usb_cam in working_cameras:
+        working_usb_cam.setup_size_format()
+        time.sleep(0.1)
+        working_usb_cam.setup_for_exp()
+
+    time_after_cams = datetime.datetime.now()
+    print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
+
+    # here we arm the app to gather the data
+    update_diagnostics(dsc=0, n=1)
+
+    print(f"The app is fully ready!!!!!")
     while True:
         # if not current_experiment.armed and trigger.triggered:  # meaning the trigger happened while exp was not armed
         #     trigger.triggered = False
@@ -182,6 +213,9 @@ if __name__ == "__main__":
             # First let everyone know that the trigger event happened
             usb_spec2000.triggered = True
             checker.statuses[4] = 0
+
+            for working_usb_cam in working_cameras:
+                working_usb_cam.triggered = True
             # Now let's deal with the rest of this hell (oscilloscope)
 
             # print(f"Current folder 2 interf={current_folders.interferometer_folder}")

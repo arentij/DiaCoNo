@@ -100,7 +100,7 @@ class Camera:
         self.vid_mid = vid_mid
         self.hdmi = False
         self.cap = []
-
+        self.current_folders = Folder()
         self.frames_times = []
         self.frames = []
         # print(self.vid_mid)
@@ -153,7 +153,8 @@ class Camera:
             set_resolution_and_pixelformat(self.path, self.parameters['resolution'], self.file_format)
         return True
 
-    def setup_worker(self):
+    def setup_worker(self, current_folders):
+        self.current_folders = current_folders
         self.running_worker = threading.Thread(target=self.running_and_writing, args=())
     def take_bright_pic(self, abs_exposure = 100):
         self.setup_for_bright()
@@ -176,7 +177,7 @@ class Camera:
                 continue
             time.sleep(random.uniform(0.001, 0.010))
             video_source_name = f"Video{self.fps}_{self.path.split('/')[-1][5:]}"
-            image_filename = f"{save_folder.image_folder}{video_source_name}.jpg"
+            image_filename = f"{self.current_folders.image_folder}{video_source_name}.jpg"
             # print(image_filename)
 
             try:
@@ -252,7 +253,7 @@ class Camera:
         # print(float(self.path[10:]))
         print(f"Now {self.path} needs to wait {time_to_wait_to_write} s to write")
         time.sleep(time_to_wait_to_write)
-        output_file = f"{save_folder.video_folder}{self.path[5:]}.avi"
+        output_file = f"{self.current_folders.video_folder}{self.path[5:]}.avi"
         print(output_file)
         out = cv2.VideoWriter(output_file, fourcc, self.fps, self.resolution)
 
@@ -262,7 +263,7 @@ class Camera:
 
         count = 0
         if True:
-            fldr = f"{save_folder.video_folder}{self.path[5:]}"
+            fldr = f"{self.current_folders.video_folder}{self.path[5:]}"
             check_create_folder(fldr)
 
             for frame in self.frames:
@@ -287,12 +288,10 @@ class Camera:
 
 
 if __name__ == "__main__":
-    save_folder = Folder()
-    save_folder.update_folders(dsc=0, n=4)
-
+    current_folders = Folder()
     time_before = datetime.datetime.now()
     working_cameras = []
-
+    current_folders.update_folders(dsc=0, n=5)
     print(f"starting ")
 
     for camera in list_usb_cameras():
@@ -332,7 +331,7 @@ if __name__ == "__main__":
     # now lets initiate the runners and wait
     for working_usb_cam in working_cameras:
         working_usb_cam.triggered = False
-        working_usb_cam.setup_worker()
+        working_usb_cam.setup_worker(current_folders)
         working_usb_cam.running_worker.start()
         print(f"Camera {working_usb_cam.path} started ")
     time.sleep(10)
@@ -348,11 +347,11 @@ if __name__ == "__main__":
 
 
     print("Arming again")
-    save_folder.update_folders(dsc=1, n=10)
+    current_folders.update_folders(dsc=1, n=11)
 
     for working_usb_cam in working_cameras:
         working_usb_cam.triggered = False
-        working_usb_cam.setup_worker()
+        working_usb_cam.setup_worker(current_folders)
         try:
             working_usb_cam.running_worker.start()
             print(f"Camera {working_usb_cam.path} started ")
