@@ -164,6 +164,7 @@ class USB_spectrometer:
     # def running_new_exp(self, current_folders):
 
     def setup_worker(self, dsc=0, n=0, save_folder="/CMFX_RAW/tests/spectrometer/"):
+
         self.dsc = dsc
         self.N_exp = n
         self.save_folder = save_folder

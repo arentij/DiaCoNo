@@ -36,11 +36,13 @@ if __name__ == "__main__":
     cam3 = Camera("/dev/video4")
     cam4 = Camera("/dev/video6")
     cam5 = Camera("/dev/video8")
+    cam6 = Camera("/dev/video10")
 
     cam1.worker.start()
     cam2.worker.start()
     cam3.worker.start()
     cam4.worker.start()
     cam5.worker.start()
+    cam6.worker.start()
 
 

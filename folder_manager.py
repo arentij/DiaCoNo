@@ -10,7 +10,7 @@ class Folder:
 
         self.base_folder = "/CMFX_RAW/"
 
-        self.video_folder = f"{self.base_folder}video/"
+        self.video_folder = f"{self.base_folder}video/CMFX_{0:05d}/"
         self.spectrometer_folder = f"{self.base_folder}spectrometer/"
         self.interferometer_folder = f"{self.base_folder}interferometer/"
         self.image_folder = f"{self.base_folder}image/"
@@ -31,7 +31,7 @@ class Folder:
             else:
                 now_str = ''
         # today_str = f"_{datetime.datetime.now().strftime('%y%m%d_%H%M%S')}"
-        self.video_folder = f"{self.base_folder}video/"
+        self.video_folder = f"{self.base_folder}video/CMFX_{n:05d}/"
         check_create_folder(self.video_folder)
         self.spectrometer_folder = f"{self.base_folder}spectrometer/"
         check_create_folder(self.spectrometer_folder)

@@ -66,6 +66,8 @@ def update_diagnostics(dsc=0, n=0):
     current_experiment.discharge = dsc
     current_experiment.armed = True
 
+    scope_DHO4204.reset()
+
     for spectrometer in spectrometers:
         spectrometer.triggered = False
 
@@ -165,7 +167,7 @@ if __name__ == "__main__":
     # print(f"Current folder 1 interf={current_folders.interferometer_folder}")
 
     checker = Checker(scope_DHO4204, usb_spec2000, current_experiment, trigger)
-    checker.worker.start()
+    # checker.worker.start()
 
     while True:
         # if not current_experiment.armed and trigger.triggered:  # meaning the trigger happened while exp was not armed
