@@ -197,7 +197,7 @@ if __name__ == "__main__":
     print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
 
     # here we arm the app to gather the data
-    update_diagnostics(dsc=0, n=1)
+    update_diagnostics(dsc=1, n=15)
 
     print(f"The app is fully ready!!!!!")
     while True:

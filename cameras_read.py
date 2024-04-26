@@ -61,6 +61,7 @@ def write_v4l2_param(device, parameter, value):
         print(f"Error: {e}")
         return None
 
+
 def set_resolution_and_pixelformat(device, resolution, pixelformat):
 
     command = ["v4l2-ctl", "-d", device, "--set-fmt-video", f"width={resolution[0]},height={resolution[1]},pixelformat={pixelformat}"]
@@ -105,15 +106,15 @@ class Camera:
         self.frames = []
         # print(self.vid_mid)
         cam260_param = {"name": "usb260", "fps": 260, 'resolution': [640, 360], 'auto_exposure': 1,
-                        "exposure_time_absolute": 2, "exposure_time_absolute_br": 8179, 'adjust': True, 'notes': 'fast but low res'}
+                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 8179, 'adjust': True, 'notes': 'fast but low res'}
         cam120_param = {"name": "usb120bw", "fps": 120, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 3, "exposure_time_absolute_br": 200, 'adjust': True, 'notes': 'medium fast BW'}
+                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 5000, 'adjust': True, 'notes': 'medium fast BW'}
         cam121_param = {"name": "usb121bw", "fps": 120, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 1500, 'adjust': True,
+                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 5000, 'adjust': True,
                         'notes': 'medium fast BW 2'}
 
         cam090_param = {"name": "usb90", "fps": 90, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 1, 'adjust': True, 'notes': 'slow but high res'}
+                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 10000, 'adjust': True, 'notes': 'slow but high res'}
         hdmi_stream1 = {"name": "hdmi_usb1", "fps": 60, 'resolution': [1920, 1080],
                         'adjust': False, 'notes': "HDMI 2 USB V1"}
 
@@ -267,8 +268,13 @@ class Camera:
             check_create_folder(fldr)
 
             for frame in self.frames:
-                cv2.imwrite(fldr + "/frame%d.jpg" % count, frame)
-                count += 1
+                try:
+                    cv2.imwrite(fldr + "/frame%d.jpg" % count, frame)
+                    count += 1
+
+                except cv2.error as e:
+                    print(f"couldn't write the jpg due to {e}")
+                    continue
 
         output_file2 = output_file[0:-4] + ".txt"
         # Open the file in write mode
@@ -291,7 +297,7 @@ if __name__ == "__main__":
     current_folders = Folder()
     time_before = datetime.datetime.now()
     working_cameras = []
-    current_folders.update_folders(dsc=0, n=5)
+    current_folders.update_folders(dsc=1, n=17)
     print(f"starting ")
 
     for camera in list_usb_cameras():
@@ -341,13 +347,13 @@ if __name__ == "__main__":
         working_usb_cam.triggered = True
     # now it might be a time for a trigger
 
-    print('Waiting 40 sec')
+    # print('Waiting 20 sec')
     time.sleep(20)
 
 
 
     print("Arming again")
-    current_folders.update_folders(dsc=1, n=11)
+    current_folders.update_folders(dsc=1, n=18)
 
     for working_usb_cam in working_cameras:
         working_usb_cam.triggered = False
