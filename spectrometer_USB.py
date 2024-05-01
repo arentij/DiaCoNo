@@ -2,18 +2,27 @@ import datetime
 import threading
 import time
 import os
+
+import seabreeze
+import usb.core
+
+seabreeze.use('pyseabreeze')
 from seabreeze.spectrometers import Spectrometer, list_devices
+
+# from seabreeze.spectrometers import Spectrometer, list_devices
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy
 
 class USB_spectrometer:
-    def __init__(self, integ_time=3000, max_time=0.5, dsc=0, n=0, save_folder="/CMFX_RAW/tests/spectrometer/"):
+    def __init__(self, integ_time=3000, max_time=0.5, dsc=0, n=0, save_folder="/CMFX_RAW/tests/spectrometer/", serial="USB2G410"):
         self.running = False
         self.connected = False
         self.triggered = False
         self.max_time = max_time
 
+        self.serial = serial # old "USB2G410", new "SR200584"
         self.dsc = dsc
         self.N_exp = n
         self.save_folder = save_folder
@@ -55,11 +64,12 @@ class USB_spectrometer:
         return True
 
     def connecting(self):
-        print("Attempting connecting to the spectrometer!!!!!!!!!!")
+        print(f"Attempting connecting to the spectrometer {self.serial}")
         if True:
 
             try:
-                self.spect = Spectrometer.from_serial_number("USB2G410")
+                self.spect = Spectrometer.from_serial_number(self.serial)
+                # self.spect = Spectrometer.from_serial_number("SR200584")
                 self.time_connected = datetime.datetime.now()
                 self.spect.integration_time_micros(self.integration_time)
 
@@ -122,7 +132,11 @@ class USB_spectrometer:
             self.connecting()
         print("Spectrometer is running and reading")
         time_started_running = datetime.datetime.now()
-        inten_when_started_running = self.spect.intensities()
+        time.sleep(0.5)
+        try:
+            inten_when_started_running = self.spect.intensities()
+        except usb.core.USBTimeoutError as e:
+            print(f"something went wrong with the spectrometer {self.serial}: {e}")
 
         self.times_exp = [time_started_running]
         self.times_exp.append(datetime.datetime.now())
@@ -157,8 +171,8 @@ class USB_spectrometer:
         # print(f"Len times {len(dt)}")
         # print(f"Len  df {len(df)}")
 
-        dt.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer_times.csv', index=False)
-        df.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer.csv', index=False)
+        dt.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer{self.serial}_times.csv', index=False)
+        df.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer{self.serial}.csv', index=False)
         print("saved the spectrometer files")
         self.triggered = False
     # def running_new_exp(self, current_folders):
@@ -175,7 +189,7 @@ class USB_spectrometer:
 
 if __name__ == "__main__":
     # print("Started")
-    USB2k_spec = USB_spectrometer()
+    USB2k_spec = USB_spectrometer(integ_time=2000, serial="SR200584")
     print("Created the object")
 
     before = datetime.datetime.now()
@@ -192,7 +206,7 @@ if __name__ == "__main__":
 
 
 
-    print("Started connecting!!!!!!")
+    print(f"Started connecting!!!!!!")
 
     time.sleep(0.1)
     print("Waiting for the trigger")

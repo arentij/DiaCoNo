@@ -1,16 +1,24 @@
 import numpy
-from seabreeze.spectrometers import Spectrometer, list_devices
+
+import seabreeze
+seabreeze.use('pyseabreeze')
+import seabreeze.spectrometers as sb
+
+
+from seabreeze.spectrometers import list_devices
 import matplotlib.pyplot as plt
 from datetime import datetime
 print('SpectrometerInitiated')
 start_read = datetime.now()
-# devices = list_devices()
-# print(*devices)
-# spect = Spectrometer.from_first_available()
+devices = list_devices()
+print(*devices)
+
+spect = sb.Spectrometer(devices[0])
+# from_first_available()
 # spect = Spectrometer(devices[0])
 
 
-spect = Spectrometer.from_serial_number("USB2G410")
+# spect = Spectrometer.from_serial_number("USB2G410")
 # spect.is_open
 print('Found the spectrometer')
 

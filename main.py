@@ -150,8 +150,12 @@ if __name__ == "__main__":
     scopes = [scope_DHO4204]
 
     usb_spec2000 = USB_spectrometer(integ_time=3000, max_time=0.5)
-    spectrometers = [usb_spec2000]
-    usb_spec2000.connect.start()
+    usb_specSR2 =  USB_spectrometer(integ_time=2000, serial="SR200584", max_time=0.5)
+
+    spectrometers = [usb_spec2000, usb_specSR2]
+
+    for spectrometer in spectrometers:
+        spectrometer.connect.start()
 
     # usb_spec2000.search_device_worker.start()
 
@@ -197,7 +201,7 @@ if __name__ == "__main__":
     print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
 
     # here we arm the app to gather the data
-    update_diagnostics(dsc=1, n=15)
+    update_diagnostics(dsc=0, n=16)
 
     print(f"The app is fully ready!!!!!")
     while True:
@@ -206,12 +210,14 @@ if __name__ == "__main__":
         # print(f"Triggered = {trigger.triggered}")
         now = datetime.datetime.now()
         if trigger.time_to_clear:
-            scope_DHO4204.reset()
+            for scope in scopes:
+                scope.reset()
             trigger.time_to_clear = False
         # print(f"Spectrometer status triggered = {usb_spec2000.triggered}")
         if trigger.triggered and current_experiment.armed:
             # First let everyone know that the trigger event happened
-            usb_spec2000.triggered = True
+            for spectrometer in spectrometers:
+                spectrometer.triggered = True
             checker.statuses[4] = 0
 
             for working_usb_cam in working_cameras:
@@ -229,8 +235,9 @@ if __name__ == "__main__":
             try:
                 print(f"Time to read the scope")
                 # scope_DHO4204.set_runNumber(last_experiment.exp_number)
-                scope_DHO4204.create_worker(scope_columns, current_folders, current_experiment)
-                scope_DHO4204.read_and_write_worker.start()
+                for scope in scopes:
+                    scope.create_worker(scope_columns, current_folders, current_experiment)
+                    scope.read_and_write_worker.start()
                 # These results are listed in accordance with the 'columns' variable in constants.py
                 # If the user would like to add or remove fields please make those changes in constant.py
 
