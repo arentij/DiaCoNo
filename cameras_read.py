@@ -62,16 +62,16 @@ def write_v4l2_param(device, parameter, value):
         return None
 
 
-def set_resolution_and_pixelformat(device, resolution, pixelformat):
+def set_resolution_and_pixelformat(device, resolution, pixelformat, fps):
 
-    command = ["v4l2-ctl", "-d", device, "--set-fmt-video", f"width={resolution[0]},height={resolution[1]},pixelformat={pixelformat}"]
+    command = ["v4l2-ctl", "-d", device, "--set-fmt-video", f"width={resolution[0]},height={resolution[1]},pixelformat={pixelformat}", f"--set-parm={fps}"]
     # command = ["v4l2-ctl", "-d", "/dev/video2", "--set-fmt-video=width=1920,height=1080,pixelformat=MJPG"]
     command2 = ["v4l2-ctl", "-d", device, "--set-fmt-video", f"pixelformat=MJPG"]
     print(f"For {device}")
     print(*command)
     try:
         # time.sleep(1)
-        subprocess.run(command, check=True)
+        subprocess.run(command, capture_output=True, text=True, check=True)
         # subprocess.run()
 
         # print("Resolution and pixel format set successfully.")
@@ -106,15 +106,15 @@ class Camera:
         self.frames = []
         # print(self.vid_mid)
         cam260_param = {"name": "usb260", "fps": 260, 'resolution': [640, 360], 'auto_exposure': 1,
-                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 8179, 'adjust': True, 'notes': 'fast but low res'}
-        cam120_param = {"name": "usb120bw", "fps": 120, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 5000, 'adjust': True, 'notes': 'medium fast BW'}
-        cam121_param = {"name": "usb121bw", "fps": 120, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 5000, 'adjust': True,
+                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'fast but low res'}
+        cam120_param = {"name": "usb120bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
+                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'medium fast BW'}
+        cam121_param = {"name": "usb121bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
+                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True,
                         'notes': 'medium fast BW 2'}
 
-        cam090_param = {"name": "usb90", "fps": 90, 'resolution': [1280, 720], 'auto_exposure': 1,
-                        "exposure_time_absolute": 1, "exposure_time_absolute_br": 10000, 'adjust': True, 'notes': 'slow but high res'}
+        cam090_param = {"name": "usb90", "fps": 90, 'resolution': [640, 480], 'auto_exposure': 1,
+                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'slow but high res'}
         hdmi_stream1 = {"name": "hdmi_usb1", "fps": 60, 'resolution': [1920, 1080],
                         'adjust': False, 'notes': "HDMI 2 USB V1"}
 
@@ -151,7 +151,7 @@ class Camera:
 
     def setup_size_format(self):
         if self.parameters['adjust']:
-            set_resolution_and_pixelformat(self.path, self.parameters['resolution'], self.file_format)
+            set_resolution_and_pixelformat(self.path, self.parameters['resolution'], self.file_format, self.fps)
         return True
 
     def setup_worker(self, current_folders):
@@ -199,7 +199,7 @@ class Camera:
         threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
         return threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
 
-    def running_and_writing(self, time_to_record=2):
+    def running_and_writing(self, time_to_record=7):
         self.cap = cv2.VideoCapture(self.path, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
@@ -277,6 +277,7 @@ class Camera:
                     continue
 
         output_file2 = output_file[0:-4] + ".txt"
+        output_file3 = output_file[0:-4] + "_param.txt"
         # Open the file in write mode
         with open(output_file2, 'w') as file:
             # Iterate over each number in the list
@@ -290,6 +291,16 @@ class Camera:
         self.frames = []
         self.frames_times = []
         print(f"Closing cam on {self.path}")
+
+        try:
+            output_cam_param = subprocess.check_output(['v4l2-ctl', '-d', self.path, '--all'], stderr=subprocess.STDOUT,
+                                                       universal_newlines=True)
+            with open(output_file3, 'w') as f:
+                f.write(output_cam_param)
+
+        except subprocess.CalledProcessError as e:
+            print(f"Error: {e.output}")
+
         return True
 
 
@@ -297,7 +308,7 @@ if __name__ == "__main__":
     current_folders = Folder()
     time_before = datetime.datetime.now()
     working_cameras = []
-    current_folders.update_folders(dsc=1, n=17)
+    current_folders.update_folders(dsc=0, n=28)
     print(f"starting ")
 
     for camera in list_usb_cameras():
@@ -326,7 +337,7 @@ if __name__ == "__main__":
 
         working_usb_cam.setup_size_format()
         time.sleep(0.1)
-        working_usb_cam.setup_for_exp()
+        # working_usb_cam.setup_for_exp()
 
     time_after = datetime.datetime.now()
     print(f"It took {(time_after-time_before).total_seconds()} s to initiate the cams")
@@ -340,7 +351,7 @@ if __name__ == "__main__":
         working_usb_cam.setup_worker(current_folders)
         working_usb_cam.running_worker.start()
         print(f"Camera {working_usb_cam.path} started ")
-    time.sleep(10)
+    time.sleep(3)
 
     print(f"triggering")
     for working_usb_cam in working_cameras:
@@ -351,34 +362,34 @@ if __name__ == "__main__":
     time.sleep(20)
 
 
-
-    print("Arming again")
-    current_folders.update_folders(dsc=1, n=18)
-
-    for working_usb_cam in working_cameras:
-        working_usb_cam.triggered = False
-        working_usb_cam.setup_worker(current_folders)
-        try:
-            working_usb_cam.running_worker.start()
-            print(f"Camera {working_usb_cam.path} started ")
-        except RuntimeError as e:
-            print(f"Couldnt start cuz {e}")
-
-    print("AAAND")
-    print(3)
-    time.sleep(1)
-    print(2)
-    time.sleep(1)
-    print(1)
-    time.sleep(1)
-    print(f"triggering again!!!")
-    for working_usb_cam in working_cameras:
-        working_usb_cam.triggered = True
-    # now it might be a time for a trigger
-
-    for working_usb_cam in working_cameras:
-        working_usb_cam.running_worker.join()
-
-    print('Waiting till joined (huh?)')
-    time.sleep(1)
+    #
+    # print("Arming again")
+    # current_folders.update_folders(dsc=1, n=18)
+    #
+    # for working_usb_cam in working_cameras:
+    #     working_usb_cam.triggered = False
+    #     working_usb_cam.setup_worker(current_folders)
+    #     try:
+    #         working_usb_cam.running_worker.start()
+    #         print(f"Camera {working_usb_cam.path} started ")
+    #     except RuntimeError as e:
+    #         print(f"Couldnt start cuz {e}")
+    #
+    # print("AAAND")
+    # print(3)
+    # time.sleep(1)
+    # print(2)
+    # time.sleep(1)
+    # print(1)
+    # time.sleep(1)
+    # print(f"triggering again!!!")
+    # for working_usb_cam in working_cameras:
+    #     working_usb_cam.triggered = True
+    # # now it might be a time for a trigger
+    #
+    # for working_usb_cam in working_cameras:
+    #     working_usb_cam.running_worker.join()
+    #
+    # print('Waiting till joined (huh?)')
+    # time.sleep(1)
 

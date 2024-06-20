@@ -16,7 +16,7 @@ import pandas as pd
 import numpy
 
 class USB_spectrometer:
-    def __init__(self, integ_time=3000, max_time=0.5, dsc=0, n=0, save_folder="/CMFX_RAW/tests/spectrometer/", serial="USB2G410"):
+    def __init__(self, integ_time=3000, max_time=1, dsc=0, n=0, save_folder="/CMFX_RAW/tests/spectrometer/", serial="USB2G410"):
         self.running = False
         self.connected = False
         self.triggered = False
@@ -85,7 +85,7 @@ class USB_spectrometer:
                 # plt.show()
 
             except Exception as e:
-                print(f"Could not connect to the spectrometer due to: {e}")
+                print(f"Could not connect to the spectrometer {self.serial} due to: {e}")
                 self.connected = False
 
                 time.sleep(0.1)
@@ -130,12 +130,13 @@ class USB_spectrometer:
     def running_reading_writing(self):
         if not self.connected:
             self.connecting()
-        print("Spectrometer is running and reading")
+        print(f"Spectrometer {self.serial} is running and reading")
         time_started_running = datetime.datetime.now()
         time.sleep(0.5)
         try:
             inten_when_started_running = self.spect.intensities()
         except usb.core.USBTimeoutError as e:
+            inten_when_started_running = []
             print(f"something went wrong with the spectrometer {self.serial}: {e}")
 
         self.times_exp = [time_started_running]
@@ -160,6 +161,7 @@ class USB_spectrometer:
         print(f"Read {self.max_time} s of spectras, time to write")
         self.triggered = False
         self.save_csv()
+        return True
 
     def save_csv(self):
     #     we need to save the waves, the intensities, times, and integration time
@@ -173,7 +175,7 @@ class USB_spectrometer:
 
         dt.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer{self.serial}_times.csv', index=False)
         df.to_csv(f'{self.save_folder}CMFX_{self.N_exp:05d}_spectrometer{self.serial}.csv', index=False)
-        print("saved the spectrometer files")
+        print(f"saved the spectrometer {self.serial} files")
         self.triggered = False
     # def running_new_exp(self, current_folders):
 

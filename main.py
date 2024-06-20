@@ -68,7 +68,8 @@ def update_diagnostics(dsc=0, n=0):
     current_experiment.discharge = dsc
     current_experiment.armed = True
 
-    scope_DHO4204.reset()
+    for scope in scopes:
+        scope.reset()
 
     for spectrometer in spectrometers:
         spectrometer.triggered = False
@@ -143,16 +144,14 @@ if __name__ == "__main__":
     # The object to store the information about the current experiment
     current_experiment = Experiment()
 
-
-
-
     scope_DHO4204 = Oscilloscope()
     scopes = [scope_DHO4204]
-
-    usb_spec2000 = USB_spectrometer(integ_time=3000, max_time=0.5)
-    usb_specSR2 =  USB_spectrometer(integ_time=2000, serial="SR200584", max_time=0.5)
+    
+    usb_spec2000 = USB_spectrometer(integ_time=130000, max_time=7)
+    usb_specSR2 =  USB_spectrometer(integ_time=100000, serial="SR200584", max_time=7)
 
     spectrometers = [usb_spec2000, usb_specSR2]
+    # spectrometers = [usb_spec2000]
 
     for spectrometer in spectrometers:
         spectrometer.connect.start()
@@ -163,7 +162,8 @@ if __name__ == "__main__":
     #     time.sleep(5)
     #     print(5)
     time.sleep(1)
-    scope_DHO4204.reset()
+    for scope in scopes:
+        scope.reset()
 
     # WUT?
     scope_columns = {'INT01': {'name': 'INT01 (V)', 'type': 'array'},
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
 
     # here we arm the app to gather the data
-    update_diagnostics(dsc=0, n=16)
+    update_diagnostics(dsc=0, n=27)
 
     print(f"The app is fully ready!!!!!")
     while True:
@@ -252,4 +252,5 @@ if __name__ == "__main__":
 
             trigger.triggered = False
             current_experiment.armed = False
+            print("Ready for a new shot")
         time.sleep(0.001)

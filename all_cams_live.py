@@ -40,7 +40,7 @@ def stream(device):
 if __name__ == "__main__":
 
 
-    device1 = '/dev/video12'
+    device1 = '/dev/video2'
     device2 = '/dev/video10'
     # stream(device)
     cam1_worker = threading.Thread(target=stream, args=([device1]))
