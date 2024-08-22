@@ -16,14 +16,21 @@
 
     function update_page() {
 
-        $.getJSON($SCRIPT_ROOT + '/return_one',
+        $.getJSON($SCRIPT_ROOT + '/update_index',
         {a1:1, b1:1},
         function(data) {
             $("#time_box").text(data.time);
+            $("#exp_n_box").text(data.N_exp);
+            $("#scope_status_box").text(data.scope_stat);
+            $("#int_file_box").text(data.int_fname);
+            $("#scope_status_box").css("color", data.scope_color);
+
+<!--int_fname-->
+
             d = new Date();
 
 <!--            $("#all_plot").attr("src", "static/camphoto.jpg?"+d.getTime());-->
-            $("#all_plot2").attr("src", "static/camphoto2.jpg?"+d.getTime());
+<!--            $("#all_plot2").attr("src", "static/camphoto2.jpg?"+d.getTime());-->
 
 
 
@@ -39,18 +46,24 @@
 
 
 <body onload="StartUpdating();">
-Time: <span id=time_box>0</span>
+Time: <span id=time_box>0</span>  <br>
+Exp Number: <span id=exp_n_box>0</span> <br>
+<!--Interferometer Status <span id=int_status_box>0</span> <br>-->
+Interferometer Status: <span id=scope_status_box> </span> <br>
 
+<br>
+<p><a href="/data">Data</a></p>
+<!--Int File: <span id=int_file_box> </span> <br>-->
 
 <!--<div class="column">-->
 <!--&lt;!&ndash;    <img id="all_plot" src="static/camphoto.jpg"   style="width:50%; left: 0;"/>&ndash;&gt;-->
 <!--&lt;!&ndash;    <img id="all_plot_pressure" src="static/camphoto.jpg"   style="width:100%; left: 0;"/>&ndash;&gt;-->
 <!--</div>-->
 
-<div class="column">
-    <img id="all_plot2" src="static/camphoto2.jpg"   style="width:50%; left: 0;"/>
-<!--    <img id="all_plot_pressure" src="static/camphoto.jpg"   style="width:100%; left: 0;"/>-->
-</div>
+<!--<div class="column">-->
+<!--    <img id="all_plot2" src="static/camphoto2.jpg"   style="width:50%; left: 0;"/>-->
+<!--&lt;!&ndash;    <img id="all_plot_pressure" src="static/camphoto.jpg"   style="width:100%; left: 0;"/>&ndash;&gt;-->
+<!--</div>-->
 <!--<div class="column">-->
 <!--    <img id="short_plot" src="static/camphoto.jpgg"   style="width:100%; "/>-->
 <!--    <img id="short_plot_pressure" src="static/camphoto.jpg"   style="width:100%; "/>-->

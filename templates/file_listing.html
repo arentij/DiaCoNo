@@ -1,0 +1,24 @@
+<!doctype html>
+<html>
+<head>
+    <title>File Listing</title>
+</head>
+<body>
+    <h1>Directory Listing</h1>
+    <ul>
+        {% for item in items %}
+            <li>
+                {% if item.is_dir %}
+                    <a href="{{ url_for('list_files', path=item.path) }}">{{ item.name }}/</a>
+                {% else %}
+                    {% if item.name.endswith('.jpg') %}
+                        <a href="{{ url_for('view_image', path=item.path) }}">{{ item.name }}</a> ({{ item.size }} bytes)
+                    {% else %}
+                        <a href="{{ url_for('download_file', path=item.path) }}">{{ item.name }}</a> ({{ item.size }} bytes)
+                    {% endif %}
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

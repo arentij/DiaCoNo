@@ -106,15 +106,15 @@ class Camera:
         self.frames = []
         # print(self.vid_mid)
         cam260_param = {"name": "usb260", "fps": 260, 'resolution': [640, 360], 'auto_exposure': 1,
-                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'fast but low res'}
+                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'fast but low res'}
         cam120_param = {"name": "usb120bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
-                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'medium fast BW'}
+                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'medium fast BW'}
         cam121_param = {"name": "usb121bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
-                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True,
+                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True,
                         'notes': 'medium fast BW 2'}
 
         cam090_param = {"name": "usb90", "fps": 90, 'resolution': [640, 480], 'auto_exposure': 1,
-                        "exposure_time_absolute": 30, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'slow but high res'}
+                        "exposure_time_absolute": 10, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'slow but high res'}
         hdmi_stream1 = {"name": "hdmi_usb1", "fps": 60, 'resolution': [1920, 1080],
                         'adjust': False, 'notes': "HDMI 2 USB V1"}
 
@@ -199,7 +199,7 @@ class Camera:
         threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
         return threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
 
-    def running_and_writing(self, time_to_record=7):
+    def running_and_writing(self, time_to_record=10):
         self.cap = cv2.VideoCapture(self.path, cv2.CAP_V4L2)
         self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
@@ -220,7 +220,10 @@ class Camera:
             # lets read every frame till we get to the trigger
 
             time_attempted_to_reach_frame = datetime.datetime.now()
-            ret, frame = self.cap.read()
+            try:
+                ret, frame = self.cap.read()
+            except Exception as e:
+                continue
             time_after_read = datetime.datetime.now()
 
             # if not ret:
@@ -308,7 +311,7 @@ if __name__ == "__main__":
     current_folders = Folder()
     time_before = datetime.datetime.now()
     working_cameras = []
-    current_folders.update_folders(dsc=0, n=28)
+    current_folders.update_folders(dsc=0, n=30)
     print(f"starting ")
 
     for camera in list_usb_cameras():

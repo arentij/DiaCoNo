@@ -145,10 +145,13 @@ class USB_spectrometer:
         self.inten_exp.append(self.spect.intensities())
 
         while not self.triggered:
-            self.times_exp = [time_started_running]
-            self.times_exp.append(datetime.datetime.now())
-            self.inten_exp = [inten_when_started_running]
-            self.inten_exp.append(self.spect.intensities())
+            try:
+                self.inten_exp = [inten_when_started_running]
+                self.inten_exp.append(self.spect.intensities())
+                self.times_exp = [time_started_running]
+                self.times_exp.append(datetime.datetime.now())
+            except Exception as e:
+                print(f"something went wrong with the spectrometer ")
         # print(len(self.inten_exp))
         self.time_triggered = datetime.datetime.now()
         while (datetime.datetime.now() - self.time_triggered).total_seconds() < self.max_time:

@@ -6,6 +6,7 @@ from tqdm import tqdm
 import threading
 from folder_manager import *
 # from main import checker
+# from main import index_data
 class Oscilloscope:
     def __init__(self, channels={'INT01': '1', 'INT01_DRIVER': '2', 'INT02': '3', 'INT02_DRIVER': '4'}, nPoints=None, memoryDepth='1M', auto_reset=False, reaching_point='TCPIP::169.254.146.112::INSTR'):
         self.channels = channels
@@ -14,7 +15,7 @@ class Oscilloscope:
         self.data = {}
         self.connected = False
         self.busy = False
-
+        self.status = 'Initiated'
         # self.dsc = 0
         # self.runNumber = 0
 
@@ -210,8 +211,9 @@ class Oscilloscope:
         if self.connected:
             print('Attempting reading data and writing the osc file')
             print(f"N={n}")
+            self.status = "Reading Scope"
             self.read_scope()
-
+            self.status = "Writing Scope Files"
             try:
                 results = [getattr(self, variable) for variable in scope_columns if
                            hasattr(self, variable)]
@@ -227,16 +229,54 @@ class Oscilloscope:
                 # print(scope_filename)
                 save_results_to_parquet(results_df, scope_filename)
                 # checker.statuses[4] = 1
+
+                s_rate = self.inst.query(':ACQ:SRAT?')
+                t_offset = self.inst.query(':TRIG:POS?')
+                preamb = self.inst.query(':WAV:PRE?')
+
+                if os.path.exists(scope_filename):
+                    # Append a suffix to the filename if it already exists
+                    base_filename, ext = os.path.splitext(scope_filename)
+                    suffix = 1
+                    while os.path.exists(f"{base_filename}_{suffix}{ext}"):
+                        suffix += 1
+                    suffix -= 1
+                    if suffix == 0:
+                        param_filename = f"{base_filename}_param{ext}"
+                    else:
+                        param_filename = f"{base_filename}_{suffix}_param{ext}"
+                else:
+                    base_filename, ext = os.path.splitext(scope_filename)
+                    param_filename = f"{base_filename}_param{ext}"
+
+                # params_list = [s_rate, t_offset, preamb]
+                # params_names_list = ['fs', 't_off', 'preamb']
+                # params = pd.concat([pd.Series(val) for val in params_list], axis=1)
+                # params.columns = [name for name in params_names_list]
+                # params.to_parquet(param_filename, index=False)
+
+                df = pd.DataFrame({
+                    'fs': [s_rate],
+                    't_off': [t_offset],
+                    'preamb': [preamb]
+                })
+                # df.to_parquet(param_filename, index=False)
+                base_filename, ext = os.path.splitext(param_filename)
+                param_filename_csv = f"{base_filename}.csv"
+                df.to_csv(param_filename_csv, index=False)
+                print(f'Scope parameters file was saved: {param_filename_csv} ')
+                self.status = "Ready"
             except Exception as e:
                 print(e)
 
-            print(self.address)
+            # print(self.address)
 
             return True
         else:
             return False
 
     def create_worker(self, scope_columns, current_folders, current_experiment):
+        self.status = 'Reading Scope'
         self.read_and_write_worker = threading.Thread(target=self.read_data_and_write_file, args=(current_experiment.exp_number, scope_columns, current_folders))
 
 
