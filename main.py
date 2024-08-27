@@ -1,6 +1,6 @@
 from flask import Flask, render_template, request, jsonify
 from flask import send_from_directory, render_template_string, abort
-
+from datetime import timedelta
 import threading
 import datetime
 import time
@@ -26,6 +26,7 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 # Define the directory to list
 BASE_DIR = '/CMFX'
 
+EXTERNAL_IMAGE_DIR = "/CMFX_RAW/video"  # Set this to your external image folder
 
 def get_file_info(path):
     """ Returns information about a file or directory. """
@@ -45,6 +46,22 @@ def get_file_info(path):
 @app.route("/")
 def index():
     return render_template('index.html')
+
+
+@app.route("/video", methods=["GET", "POST"])
+def video():
+    folder_number = "01212"  # Default folder number
+    time_input = 0  # Default time in milliseconds since zero time
+
+    if request.method == "POST":
+        folder_number = request.form.get("folder_number", "01212")
+        folder_number = folder_number.zfill(5)
+        time_input = int(request.form.get("time_input", 0))  # Time input in milliseconds
+
+    # Calculate time offset for each frame based on user input
+    image_data = find_images_by_time(folder_number, time_input)
+
+    return render_template("video.html", image_data=image_data, folder_number=folder_number, time_input=time_input)
 
 
 @app.route('/data')
@@ -124,10 +141,87 @@ def arm_diagnostics():
     return jsonify(time=now, n=N_exp, dsc=discharging, duration=disc_duration)
 
 
-
+@app.route("/images/<folder_number>/<subfolder>/<filename>")
+def serve_image(folder_number, subfolder, filename):
+    image_directory = os.path.join(EXTERNAL_IMAGE_DIR, f"CMFX_{folder_number}", subfolder)
+    # print(f"Image directory {image_directory}, filename {filename}")
+    return send_from_directory(image_directory, filename)
 # @app.route('/status')
 # def status():
 #     return jsonify(scope=checker.statuses[0], spectr=checker.statuses[1], N_exp=checker.statuses[2], trigger=checker.statuses[3], wrote=checker.statuses[4])
+
+
+def find_images_by_time(folder_number, time_input):
+    base_folder = os.path.join(EXTERNAL_IMAGE_DIR, f"CMFX_{folder_number}")
+    image_data = []
+    max_frames = 0
+    first_frame_time = None
+
+    # Store times for each folder and identify folder with the most frames
+    folder_times = {}
+
+    if os.path.exists(base_folder):
+        for subfolder in os.listdir(base_folder):
+            subfolder_path = os.path.join(base_folder, subfolder)
+            if not os.path.isdir(subfolder_path):
+                continue
+            # txt_file = os.path.join(subfolder_path, f"{base_folder}.txt")
+            txt_file = os.path.join(base_folder, f"{subfolder}.txt")
+            print(f"Txt file {txt_file}")
+            print(f"exist= {os.path.exists(txt_file)}")
+            if os.path.isdir(subfolder_path) and subfolder.startswith("video") and os.path.exists(txt_file):
+                # Check if the folder contains images
+                images_exist = any(
+                    fname.startswith("frame") and fname.endswith(".jpg") for fname in os.listdir(subfolder_path))
+                if not images_exist:
+                    continue
+
+                with open(txt_file, 'r') as f:
+                    times = [datetime.datetime.strptime(line.strip(), "%Y-%m-%d %H:%M:%S.%f") for line in f.readlines()]
+                    folder_times[subfolder] = times
+                    # Check for the folder with the most frames
+                    if len(times) > max_frames:
+                        max_frames = len(times)
+                        first_frame_time = times[0]
+
+    # No valid frames
+    if first_frame_time is None:
+        return image_data
+    print(True)
+    # Convert user input from milliseconds to a timedelta
+    input_time_delta = timedelta(milliseconds=time_input)
+
+    # Find and return frames close to the specified time along with their relative time in ms
+    for subfolder, times in folder_times.items():
+        subfolder_path = os.path.join(base_folder, subfolder)
+        for i, frame_time in enumerate(times):
+            relative_time = frame_time - first_frame_time
+            # print(f"Relative time {relative_time}, i={i}")
+            # print(f"Current time {frame_time-first_frame_time}")
+            # if i > 0:
+            #     print(f"Current time {(frame_time-first_frame_time).total_seconds()*1000}")
+            #     print(f"Current time {(times[i]-first_frame_time).total_seconds()*1000}")
+            #     # print(f"Current time {times[i]-first_frame_time}")
+
+            if relative_time >= input_time_delta:
+                adjusted_i = max(0, i)
+                previous_i = max(0, i-1)
+                frame_filename = f"frame{adjusted_i}.jpg"
+                frame_path = os.path.join(subfolder_path, frame_filename)
+                if os.path.exists(frame_path):
+                    relative_time = times[adjusted_i]-first_frame_time
+                    relative_time_m1 = times[previous_i]-first_frame_time
+                    relative_time_ms = int(relative_time.total_seconds() * 1000)  # Convert to milliseconds
+                    relative_time_ms_m1 = int(relative_time_m1.total_seconds() * 1000)  # Convert to milliseconds
+
+                    image_data.append({
+                        "image_path": f"/images/{folder_number}/{subfolder}/{frame_filename}",
+                        "time_in_ms": relative_time_ms,
+                        "time_in_ms_m1": relative_time_ms_m1
+                    })
+                break  # Only add the first frame matching or exceeding the time
+    # print(f"imge data {image_data}")
+    return image_data
 
 
 def run_web_app():
@@ -258,6 +352,7 @@ if __name__ == "__main__":
     # spectrometers = [usb_spec2000]
     # spectrometers = [usb_specSR2]
     spectrometers = [usb_spec2000, usb_specSR2]
+    spectrometers = [usb_spec2000]
 
     for spectrometer in spectrometers:
         spectrometer.connect.start()
