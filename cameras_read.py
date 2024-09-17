@@ -1,6 +1,7 @@
 import datetime
 import subprocess
 import time
+import numpy as np
 
 import pyudev
 import cv2
@@ -88,10 +89,12 @@ def set_resolution_and_pixelformat(device, resolution, pixelformat, fps):
 
 class Camera:
     def __init__(self, mounting_point, vid_mid):
+        self.intensities = []
         self.initiated = datetime.datetime.now()
         self.triggered = False
         self.running = False
 
+        self.time_to_record = 6
         self.path = mounting_point
         print(f"self.path={self.path}")
         self.file_format = 'MJPG'
@@ -100,26 +103,30 @@ class Camera:
         self.time_created = datetime.datetime.now()
         self.vid_mid = vid_mid
         self.hdmi = False
-        self.cap = []
+        # self.cap = []
         self.current_folders = Folder()
         self.frames_times = []
         self.frames = []
         # print(self.vid_mid)
         cam260_param = {"name": "usb260", "fps": 260, 'resolution': [640, 360], 'auto_exposure': 1,
-                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'fast but low res'}
+                        "exposure_time_absolute": 10, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'fast but low res'}
         cam120_param = {"name": "usb120bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
                         "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'medium fast BW'}
         cam121_param = {"name": "usb121bw", "fps": 120, 'resolution': [640, 480], 'auto_exposure': 1,
                         "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True,
-                        'notes': 'medium fast BW 2'}
+                        'notes': 'medium fast BW 2 (potentially POS)'}
 
         cam090_param = {"name": "usb90", "fps": 90, 'resolution': [640, 480], 'auto_exposure': 1,
                         "exposure_time_absolute": 10, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'slow but high res'}
         hdmi_stream1 = {"name": "hdmi_usb1", "fps": 60, 'resolution': [1920, 1080],
                         'adjust': False, 'notes': "HDMI 2 USB V1"}
+        stereo_bw120_param = {"name": "stereo_bw120", "fps": 120, 'resolution': [1280, 480], 'auto_exposure': 1,
+                        "exposure_time_absolute": 100, "exposure_time_absolute_br": 80, 'adjust': True, 'notes': 'stereo bw 120'}
 
         vendorID_modelID_param = {"1e4e:7103": hdmi_stream1, "32e4:4689": cam260_param,
-                                       "32e4:0234": cam090_param, "0c45:6366": cam120_param, "0c45:636d": cam121_param}
+                                       "32e4:0234": cam090_param, "0c45:6366": cam120_param, "0c45:636d": cam121_param, "32e4:9282": stereo_bw120_param}
+        # 32e4: 9282
+
         self.parameters = vendorID_modelID_param[self.vid_mid]
         self.resolution = self.parameters['resolution']
         self.fps = self.parameters['fps']
@@ -159,7 +166,7 @@ class Camera:
         self.running_worker = threading.Thread(target=self.running_and_writing, args=())
     def take_bright_pic(self, abs_exposure = 100):
         self.setup_for_bright()
-        self.cap = cv2.VideoCapture(self.path)
+        cap = cv2.VideoCapture(self.path)
         # if not self.cap.isOpened():
         #     print(f"Could not open video device: {self.path}")
 
@@ -168,12 +175,12 @@ class Camera:
         # self.cap.release()
 
         while (datetime.datetime.now() - time_attempted_writing).total_seconds() < 20:
-            self.cap = cv2.VideoCapture(self.path)
-            if not self.cap.isOpened():
+            cap = cv2.VideoCapture(self.path)
+            if not cap.isOpened():
                 print(f"Could not open video device: {self.path}")
                 continue
 
-            ret, frame = self.cap.read()
+            ret, frame = cap.read()
             if not ret:
                 continue
             time.sleep(random.uniform(0.001, 0.010))
@@ -188,10 +195,10 @@ class Camera:
                 break
             except cv2.error as e:
                 # time.sleep(random.uniform(0.001, 0.002))
-                self.cap.release()
+                cap.release()
                 print(f"{self.path} wasn't able to write the file due to: {e}")
                 continue
-        self.cap.release()
+        cap.release()
 
         return True
 
@@ -199,9 +206,9 @@ class Camera:
         threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
         return threading.Thread(target=self.take_bright_pic, args=(abs_exposure,))
 
-    def running_and_writing(self, time_to_record=10):
-        self.cap = cv2.VideoCapture(self.path, cv2.CAP_V4L2)
-        self.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
+    def running_and_writing(self):
+        cap = cv2.VideoCapture(self.path, cv2.CAP_V4L2)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
 
         time_initiated = datetime.datetime.now()
 
@@ -221,7 +228,7 @@ class Camera:
 
             time_attempted_to_reach_frame = datetime.datetime.now()
             try:
-                ret, frame = self.cap.read()
+                ret, frame = cap.read()
             except Exception as e:
                 continue
             time_after_read = datetime.datetime.now()
@@ -233,24 +240,25 @@ class Camera:
             while not self.triggered:
                 start_time = cv2.getTickCount() / cv2.getTickFrequency()
                 self.frames = [frame]
-                self.frames_times = [datetime.datetime.now()]
+                self.frames_times = [time_after_read]
 
 
             # Write the frame
-            self.frames.append(frame)
-            self.frames_times.append(datetime.datetime.now())
+            if ret:
+                self.frames.append(frame)
+                self.frames_times.append(datetime.datetime.now())
 
             # Check for 10 seconds recording limit
             current_time = cv2.getTickCount() / cv2.getTickFrequency()
-            if (current_time - start_time) > time_to_record:
+            if (current_time - start_time) > self.time_to_record:
                 print(f"For {self.path} we got {len(self.frames)} frames")
                 # print(self.frames_times)
                 break
             if (datetime.datetime.now() - time_initiated).total_seconds() > 10*60:
                 break
-
+        self.triggered = False
 #         now we need to write the files and close the cams
-        self.cap.release()
+        cap.release()
         self.triggered = False
 
         time_to_wait_to_write = float(self.path[10:])
@@ -273,7 +281,12 @@ class Camera:
             for frame in self.frames:
                 try:
                     cv2.imwrite(fldr + "/frame%d.jpg" % count, frame)
+
                     count += 1
+                    gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    # Calculate the average intensity
+                    average_intensity = np.mean(gray_frame)
+                    self.intensities.append(average_intensity)
 
                 except cv2.error as e:
                     print(f"couldn't write the jpg due to {e}")
@@ -281,6 +294,7 @@ class Camera:
 
         output_file2 = output_file[0:-4] + ".txt"
         output_file3 = output_file[0:-4] + "_param.txt"
+        output_file4 = output_file[0:-4] + "_inten.txt"
         # Open the file in write mode
         with open(output_file2, 'w') as file:
             # Iterate over each number in the list
@@ -288,11 +302,27 @@ class Camera:
             for timestamp in self.frames_times:
                 # Write each number to the file
                 file.write(str(timestamp) + '\n')
+
+        #         now lets try to write a file with intensities as a function of time
+        time_array_ms = []
+        try:
+            time_array_ms = [(time_i - self.frames_times[1]).total_seconds()*1000 for time_i in self.frames_times]
+        except Exception as e:
+            print(f"couldnt write the time array of frames as {e}")
+
+        with open(output_file4, 'w') as file:
+            len_t = min(len(time_array_ms), len(self.intensities))
+            for i_frame in range(len_t):
+                file.write(f"{str(time_array_ms[i_frame])}\t{str(self.intensities[i_frame])}\n")
+                # file.write(str(time_array_ms[i_frame]), ' ')
+
+        #         and done writing
         self.triggered = False
 
         out.release()
         self.frames = []
         self.frames_times = []
+        self.intensities = []
         print(f"Closing cam on {self.path}")
 
         try:

@@ -156,10 +156,11 @@ class USB_spectrometer:
         self.time_triggered = datetime.datetime.now()
         while (datetime.datetime.now() - self.time_triggered).total_seconds() < self.max_time:
             # print(f"Times: {(datetime.datetime.now() - self.time_triggered).total_seconds()}")
-            self.times_exp.append(datetime.datetime.now())
-            before_getting_inten = datetime.datetime.now()
+            # self.times_exp.append(datetime.datetime.now())  # before sep 17 2024 this line was functioning hence it was saving the time BEFORE the spectra was taken for every measurement except the first two ones
+            # before_getting_inten = datetime.datetime.now()
             self.inten_exp.append(self.spect.intensities())
-            after_getting_inten = datetime.datetime.now()
+            self.times_exp.append(datetime.datetime.now()) # after sep 17 2024 this line was used to indicate the END of the spectra measurement
+            # after_getting_inten = datetime.datetime.now()
             # print(f"Reading spectra lasted {(after_getting_inten-before_getting_inten).total_seconds()*1000} ms")
         print(f"Read {self.max_time} s of spectras, time to write")
         self.triggered = False

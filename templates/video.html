@@ -69,10 +69,14 @@
     <div class="grid">
       {% for image in image_data %}
         <div class="frame">
-          <p>{{ image.time_in_ms_m1 }}-{{ image.time_in_ms }} ms</p>
+          <p>{{ image.video}}, {{ image.time_in_ms_m1 }}-{{ image.time_in_ms }} ms</p>
           <img src="{{ image.image_path }}" alt="Frame Image">
         </div>
       {% endfor %}
     </div>
+  <p><a href="/data">Home</a></p>
+    <p><a href="/data">Data</a></p>
+<!--    <p><a href="/video">Video</a></p>-->
+    <p><a href="/cam_list">Cameras</a></p>
   </body>
 </html>

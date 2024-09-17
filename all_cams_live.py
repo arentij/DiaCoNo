@@ -10,8 +10,8 @@ def stream(device):
         return
 
     # Set properties - adjust as needed
-    cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+    # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+    # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
 
     # Create a window to display the video stream
     window_name = 'USB Camera Stream_' + device
@@ -37,9 +37,10 @@ def stream(device):
     cap.release()
     cv2.destroyAllWindows()
 
+
 if __name__ == "__main__":
 
-    device1 = '/dev/video'
+    device1 = '/dev/video4'
     device2 = '/dev/video10'
     # stream(device)
     cam1_worker = threading.Thread(target=stream, args=([device1]))

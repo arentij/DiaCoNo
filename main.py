@@ -1,24 +1,27 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask import send_from_directory, render_template_string, abort
 from datetime import timedelta
-import threading
-import datetime
-import time
-import cv2, os
-from matplotlib import pyplot as plt
+# import threading
+# import datetime
+# import time
+# import cv2, os
+# from matplotlib import pyplot as plt
 from flask import request
 # from remote_scope import *
-import pandas as pd
-import serial
+# import pandas as pd
+# import serial
 from trigger_setup import Trigger
 from remote_scope import Oscilloscope
-from folder_manager import *
+# from folder_manager import *
 from spectrometer_USB import *
-import numpy
-from seabreeze.spectrometers import Spectrometer, list_devices
-from setting_loggers import *
+# import numpy
+# from seabreeze.spectrometers import Spectrometer, list_devices
+# from setting_loggers import *
 from cameras_read import *
 
+# from flask import Flask, render_template, request, redirect, url_for
+import subprocess
+# import re
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -117,7 +120,18 @@ def update_index():
     if scope_status == "Ready":
         int_status_color = 'green'
     elif scope_status == "Writing Scope Files":
+
         int_status_color = 'orange'
+
+    parser_color = 'red'
+    if parsers_stat.status1 == 'Clear':
+        parser_color = 'green'
+    if parsers_stat.time1 > 4*60:
+        parser_color = 'green'
+    # try:
+    #     if parsers_stat.time1 < 10:
+    #
+
 
     return jsonify(time=now.strftime("%d/%m/%Y, %H:%M:%S"),
                    dsc=dsc,
@@ -126,7 +140,9 @@ def update_index():
                    int_write_status='red',
                    system_stat=index_data.system_status,
                    scope_stat=scope_status,
-                   scope_color=int_status_color)
+                   scope_color=int_status_color,
+                   parser_status=parsers_stat.status1,
+                   parser_color=parser_color)
 
 
 @app.route('/arm_diagnostics')
@@ -135,8 +151,9 @@ def arm_diagnostics():
     discharging = request.args.get("dsc", 0, type=float)
     disc_duration = request.args.get("dt", 0, type=float)
     now = datetime.datetime.now()
+    time_exp = request.args.get("time", 1, type=float)
 
-    update_diagnostics(discharging, N_exp)
+    update_diagnostics(discharging, N_exp, time_exp)
 
     return jsonify(time=now, n=N_exp, dsc=discharging, duration=disc_duration)
 
@@ -150,6 +167,11 @@ def serve_image(folder_number, subfolder, filename):
 # def status():
 #     return jsonify(scope=checker.statuses[0], spectr=checker.statuses[1], N_exp=checker.statuses[2], trigger=checker.statuses[3], wrote=checker.statuses[4])
 
+
+@app.route('/cam_list')
+def cam_list():
+    devices = get_video_devices()
+    return render_template('clist.html', devices=devices)
 
 def find_images_by_time(folder_number, time_input):
     base_folder = os.path.join(EXTERNAL_IMAGE_DIR, f"CMFX_{folder_number}")
@@ -217,7 +239,8 @@ def find_images_by_time(folder_number, time_input):
                     image_data.append({
                         "image_path": f"/images/{folder_number}/{subfolder}/{frame_filename}",
                         "time_in_ms": relative_time_ms,
-                        "time_in_ms_m1": relative_time_ms_m1
+                        "time_in_ms_m1": relative_time_ms_m1,
+                        "video": subfolder
                     })
                 break  # Only add the first frame matching or exceeding the time
     # print(f"imge data {image_data}")
@@ -237,7 +260,7 @@ class Experiment:
         self.armed = False
         trigger.triggered = False
 
-def update_diagnostics(dsc=0, n=0):
+def update_diagnostics(dsc=0, n=0, time_exp=5):
     # here we need to define saving folders, files, check if the devices are ready
     # updating save folders
     before = datetime.datetime.now()
@@ -253,13 +276,14 @@ def update_diagnostics(dsc=0, n=0):
 
     for spectrometer in spectrometers:
         spectrometer.triggered = False
-
+        spectrometer.max_time = time_exp + 2
         spectrometer.setup_worker(current_experiment.discharge, current_experiment.exp_number, current_folders.spectrometer_folder)
         spectrometer.worker.start()
         print(f"Spectrometer worker started")
 
     for working_usb_cam_n in working_cameras:
         working_usb_cam_n.triggered = False
+        working_usb_cam_n.time_to_record = time_exp + 2
         working_usb_cam_n.setup_worker(current_folders)
         working_usb_cam_n.running_worker.start()
         print(f"Camera {working_usb_cam_n.path} started ")
@@ -277,6 +301,43 @@ def update_diagnostics(dsc=0, n=0):
 
     print(f"Updating experiment took {(after - before).total_seconds()} s")
     return True
+
+class ParsersStat:
+    def __init__(self):
+        # self.file_path = file_path
+        self.status1 = None
+        self.time1 = None
+        # Create and start the thread
+        self.thread = threading.Thread(target=self.update_status_periodically)
+        self.thread.daemon = True  # Allow the thread to exit when the main program exits
+        self.thread.start()
+
+    def read_status_from_file(self, file_path='/CMFX/apps/parser_status.txt'):
+        try:
+            with open(file_path, 'r') as file:
+                lines = file.readlines()
+                if len(lines) < 2:
+                    return None, None
+                status = lines[0].strip()
+                last_update_time = datetime.datetime.strptime(lines[1].strip(), "%Y-%m-%d %H:%M:%S")
+                now = datetime.datetime.now()
+                time_since_update = round((now - last_update_time).total_seconds())
+                return status, last_update_time
+        except FileNotFoundError:
+            return None, None
+
+    def update_status_periodically(self):
+        """Periodically updates the status and time since last update."""
+        while True:
+            status, last_update_time = self.read_status_from_file()
+            if status and last_update_time:
+                now = datetime.datetime.now()
+                self.status1 = status
+                self.time1 = round((now - last_update_time).total_seconds())
+            else:
+                self.status1 = None
+                self.time1 = None
+            time.sleep(5)  # Wait 5 seconds before updating again
 
 
 class Checker:
@@ -319,6 +380,122 @@ class IndexData:
         self.system_status = 'Started'
 
 
+def get_video_devices1():
+    devices = []
+    for i in range(30):  # Adjust range if needed
+        device = f'/dev/video{i}'
+        try:
+            # Check if the device exists and is a video device
+            subprocess.check_output(['v4l2-ctl', '-d', device, '--all'], stderr=subprocess.STDOUT)
+            devices.append(device)
+        except subprocess.CalledProcessError:
+            pass
+    return devices
+
+
+def get_video_devices():
+    devices = []
+    for i in range(30):  # Adjust range if needed
+        device = f'/dev/video{i}'
+        try:
+            # Check if the device is functional
+            # output = subprocess.check_output(['v4l2-ctl', '-d', device, '--info'], text=True)
+            # print(output)
+            # if "Device name" in output:
+            # Perform further checks to ensure this is a valid device
+            params = subprocess.check_output(['v4l2-ctl', '-d', device, '--all'], text=True)
+            # print(params)
+            if "exposure_time_absolute" in params and "Frames per second" in params:
+                devices.append(device)
+        except subprocess.CalledProcessError:
+            # Device is either not present or not functional
+            pass
+    return devices
+
+
+# Helper function to get camera parameters
+def get_camera_parameters(device):
+    try:
+        output = subprocess.check_output(['v4l2-ctl', '-d', device, '--all'], text=True)
+        start_index = output.find("Video input")
+
+        if start_index != -1:
+            # Return everything from the line with "Video input" to the end
+            return output[start_index:]
+        else:
+            return output
+        # return output
+    except subprocess.CalledProcessError:
+        return "Error retrieving parameters"
+
+
+# Helper function to set exposure time
+def set_exposure_time(device, value):
+    try:
+        subprocess.check_output(['v4l2-ctl', '-d', device, '--set-ctrl=exposure_time_absolute=' + str(value)])
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+@app.route('/camera', methods=['GET', 'POST'])
+def camera():
+    device = request.args.get('device')
+    if request.method == 'POST':
+        exposure_time = request.form.get('exposure_time')
+        if exposure_time and device:
+            success = set_exposure_time(device, exposure_time)
+            if not success:
+                return redirect(url_for('camera', device=device, error='Failed to set exposure time'))
+        return redirect(url_for('camera', device=device))
+
+    parameters = get_camera_parameters(device)
+    return render_template('camera.html', device=device, parameters=parameters)
+
+
+def list_images(experiment_number):
+    """List all images in the experiment directory."""
+    base_dir = f'/CMFX/video/CMFX_{experiment_number:05d}'
+    if not os.path.exists(base_dir):
+        return []
+    return sorted([f for f in os.listdir(base_dir) if f.endswith('.png')])
+
+
+@app.route('/intensities', methods=['GET', 'POST'])
+def handle_intensities():
+    """Handle the /intensities route."""
+    if request.method == 'POST':
+        experiment_number = request.form.get('experiment_number')
+        if not experiment_number:
+            return "Experiment number is required", 400
+
+        try:
+            experiment_number = int(experiment_number)
+        except ValueError:
+            return "Invalid experiment number", 400
+
+        # List and display images
+        images = list_images(experiment_number)
+        return render_template('intensities.html', images=images, experiment_number=experiment_number)
+
+    return '''
+        <form method="post">
+            Experiment number: <input type="text" name="experiment_number">
+            <input type="submit" value="Submit">
+        </form>
+    '''
+
+
+@app.route('/images/<path:filename>')
+def serve_generated_image(filename):
+    """Serve the generated images."""
+    experiment_number = int(request.args.get('experiment_number'))
+    if not experiment_number:
+        abort(400)
+    base_dir = f'/CMFX/video/CMFX_{experiment_number:05d}'
+    return send_from_directory(base_dir, filename)
+
+
 if __name__ == "__main__":
 
     print('Started program')
@@ -338,21 +515,25 @@ if __name__ == "__main__":
     # The object to have the proper file management
     current_folders = Folder()
 
+    # Status updater
+    parsers_stat = ParsersStat()
+
     # The object to store the information about the current experiment
     current_experiment = Experiment()
 
     scope_DHO4204 = Oscilloscope()
     scopes = [scope_DHO4204]
     
-    usb_spec2000 = USB_spectrometer(integ_time=53000, max_time=10)
-    usb_specSR2 =  USB_spectrometer(integ_time=50000, serial="SR200584", max_time=10)
+    usb_spec2000 = USB_spectrometer(integ_time=53000, max_time=6)
+    usb_specSR2 =  USB_spectrometer(integ_time=50000, serial="SR200584", max_time=6)
 
 
     # spectrometers = []
     # spectrometers = [usb_spec2000]
     # spectrometers = [usb_specSR2]
     spectrometers = [usb_spec2000, usb_specSR2]
-    spectrometers = [usb_spec2000]
+    # spectrometers = [usb_spec2000]
+    # spectrometers = []
 
     for spectrometer in spectrometers:
         spectrometer.connect.start()
@@ -396,16 +577,20 @@ if __name__ == "__main__":
         if camera['openable'] and using_cameras:
             working_cameras.append(Camera(camera['path'], f"{camera['vendor_id']}:{camera['model_id']}"))
 
+    # working_cameras = []
+
     for working_usb_cam in working_cameras:
         working_usb_cam.setup_size_format()
         time.sleep(0.1)
         working_usb_cam.setup_for_exp()
 
+
+
     time_after_cams = datetime.datetime.now()
     print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
 
     # here we arm the app to gather the data
-    update_diagnostics(dsc=0, n=206)
+    update_diagnostics(dsc=0, n=312, time_exp=6)
 
     print(f"The app is fully ready!!!!!")
     while True:

@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intensity Plots for Experiment {{ experiment_number }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 90%;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* Three columns */
+            gap: 10px;
+        }
+        .image-gallery img {
+            width: 100%; /* Ensure images fit within their container */
+            height: auto; /* Maintain aspect ratio */
+            border: 1px solid #ddd; /* Optional: Add border around images */
+            border-radius: 4px; /* Optional: Add rounded corners */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Intensity Plots for Experiment {{ experiment_number }}</h1>
+        <div class="image-gallery">
+            {% for image in images %}
+                <div>
+                    <img src="{{ url_for('serve_generated_image', filename=image, experiment_number=experiment_number) }}" alt="{{ image }}">
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</body>
+</html>

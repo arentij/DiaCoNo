@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Camera Parameters</title>
+</head>
+<body>
+    <h1>Camera: {{ device }}</h1>
+    <pre>{{ parameters }}</pre>
+    <form method="post">
+        <label for="exposure_time">Set Exposure Time (absolute):</label>
+        <input type="number" id="exposure_time" name="exposure_time" required>
+        <button type="submit">Submit</button>
+    </form>
+
+    <p><a href="/data">Home</a></p>
+    <p><a href="/data">Data</a></p>
+    <p><a href="/video">Video</a></p>
+<!--    <p><a href="/cam_list">Cameras</a></p>-->
+</body>
+</html>
