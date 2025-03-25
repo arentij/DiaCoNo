@@ -1,6 +1,25 @@
 import cv2
 import threading
 
+
+def calculate_sharpness(frame):
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return laplacian_var
+
+
+def add_sharpness_text(frame):
+    sharpness = calculate_sharpness(frame)
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 2
+    thickness = 12
+    height, width, colors = frame.shape
+    text = f"{sharpness:.2f}"
+    text_x = width - int(0.4*width)
+    text_y = int(0.2*height)
+    frame2 = cv2.putText(frame, text, (text_x, text_y), font, font_scale, (0, 0, 255), thickness, cv2.LINE_AA)
+    return frame2
+
 def stream(device):
     # Open the video capture device
     cap = cv2.VideoCapture(device)
@@ -27,6 +46,7 @@ def stream(device):
             break
 
         # Display the frame
+        frame2 = add_sharpness_text(frame)
         cv2.imshow(window_name, frame)
 
         # Check for 'q' key to quit
@@ -35,12 +55,12 @@ def stream(device):
 
     # Release the video capture object and close all windows
     cap.release()
-    cv2.destroyAllWindows()
+    cv2.destroyAllWindows
 
 
 if __name__ == "__main__":
 
-    device1 = '/dev/video4'
+    device1 = '/dev/video10'
     device2 = '/dev/video10'
     # stream(device)
     cam1_worker = threading.Thread(target=stream, args=([device1]))

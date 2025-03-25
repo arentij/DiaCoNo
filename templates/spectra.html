@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spectrograms</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+        form {
+            margin-bottom: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+        }
+        form label {
+            margin-right: 10px;
+        }
+        form input[type="number"] {
+            width: 80px;
+            text-align: center;
+        }
+        .button-group {
+            display: flex;
+            gap: 5px;
+        }
+        .button-group button {
+            margin: 0 3px; /* Reduced margin for tighter spacing */
+            padding: 3px 8px; /* Smaller padding for a smaller button */
+            font-size: 14px; /* Smaller font size */
+            cursor: pointer;
+}
+        .button-group button + button {
+            margin-left: 5px;
+        }
+        .button-group button:last-of-type {
+            margin-right: 0;
+        }
+        .image-gallery {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two equal columns */
+            gap: 10px;
+        }
+        .image-container {
+            width: 100%;
+            height: auto;
+            overflow: hidden;
+            background-color: #f9f9f9;
+        }
+        .image-container img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        @media (max-width: 768px) {
+            .image-gallery {
+                grid-template-columns: 1fr; /* Single column on smaller screens */
+            }
+        }
+    </style>
+</head>
+<body>
+    <h3>Spectrograms</h3>
+    <form id="spectra-form" action="/spectra" method="get">
+        <label for="exp_number">Experiment Number:</label>
+        <input type="number" id="exp_number" name="exp_number" value="{{ exp_number }}" required>
+
+        <label for="time_ms">Time (ms):</label>
+        <input type="number" id="time_ms" name="time_ms" value="{{ time_ms }}" required>
+
+        <div class="button-group">
+            <button type="button" onclick="adjustTime(-50)">-50 ms</button>
+            <button type="button" onclick="adjustTime(-10)">-10 ms</button>
+            <button type="button" onclick="adjustTime(10)">+10 ms</button>
+            <button type="button" onclick="adjustTime(50)">+50 ms</button>
+        </div>
+
+        <button type="submit">Get Spectrograms</button>
+    </form>
+
+    {% if images %}
+        <h2>Images:</h2>
+        <div class="image-gallery">
+            {% for image in images %}
+                <div class="image-container">
+                    <img src="{{ url_for('serve_spectra_image', exp_number=exp_number, spectrometer=image.spectrometer, filename=image.image) }}" alt="Spectrogram">
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No images found for the given experiment number and time.</p>
+    {% endif %}
+
+    <script>
+        function adjustTime(delta) {
+            var timeInput = document.getElementById('time_ms');
+            var currentTime = parseInt(timeInput.value, 10) || 0;
+            timeInput.value = currentTime + delta;
+
+            // Submit the form to update the page with the new time value
+            document.getElementById('spectra-form').submit();
+        }
+    </script>
+
+    <p><a href="/">Home</a></p>
+    <p><a href="/data">Data</a></p>
+    <p><a href="/video">Video</a></p>
+    <p><a href="/cam_list">Cameras</a></p>
+    <p><a href="/intensities">Intensities</a></p>
+    <p><a href="/spectra">Spectrometers</a></p>
+</body>
+</html>

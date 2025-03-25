@@ -1,6 +1,8 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, send_file
 from flask import send_from_directory, render_template_string, abort
 from datetime import timedelta
+import re
+import os
 # import threading
 # import datetime
 # import time
@@ -21,7 +23,7 @@ from cameras_read import *
 
 # from flask import Flask, render_template, request, redirect, url_for
 import subprocess
-# import re
+import re
 
 app = Flask(__name__, static_url_path='/static')
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -30,6 +32,11 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 BASE_DIR = '/CMFX'
 
 EXTERNAL_IMAGE_DIR = "/CMFX_RAW/video"  # Set this to your external image folder
+
+# Updated path to images and CSV files
+SPECTRA_BASE_FOLDER = '/CMFX/spectrometer/'
+SPECTRA_RAW_FOLDER = '/CMFX_RAW/spectrometer/'
+
 
 def get_file_info(path):
     """ Returns information about a file or directory. """
@@ -50,7 +57,21 @@ def get_file_info(path):
 def index():
     return render_template('index.html')
 
-
+#
+# @app.route("/video", methods=["GET", "POST"])
+# def video():
+#     folder_number = "01212"  # Default folder number
+#     time_input = 0  # Default time in milliseconds since zero time
+#
+#     if request.method == "POST":
+#         folder_number = request.form.get("folder_number", "01212")
+#         folder_number = folder_number.zfill(5)
+#         time_input = int(request.form.get("time_input", 0))  # Time input in milliseconds
+#
+#     # Calculate time offset for each frame based on user input
+#     image_data = find_images_by_time(folder_number, time_input)
+#
+#     return render_template("video.html", image_data=image_data, folder_number=folder_number, time_input=time_input)
 @app.route("/video", methods=["GET", "POST"])
 def video():
     folder_number = "01212"  # Default folder number
@@ -61,11 +82,28 @@ def video():
         folder_number = folder_number.zfill(5)
         time_input = int(request.form.get("time_input", 0))  # Time input in milliseconds
 
+        # Adjust time based on button click
+        if 'add_100' in request.form:
+            time_input += 100
+        elif 'subtract_100' in request.form:
+            time_input -= 100
+        elif 'add_30' in request.form:
+            time_input += 30
+        elif 'subtract_30' in request.form:
+            time_input -= 30
+        elif 'add_4' in request.form:
+            time_input += 4
+        elif 'subtract_4' in request.form:
+            time_input -= 4
+        elif 'add_1' in request.form:
+            time_input += 1
+        elif 'subtract_1' in request.form:
+            time_input -= 1
+
     # Calculate time offset for each frame based on user input
     image_data = find_images_by_time(folder_number, time_input)
 
     return render_template("video.html", image_data=image_data, folder_number=folder_number, time_input=time_input)
-
 
 @app.route('/data')
 def data():
@@ -131,7 +169,18 @@ def update_index():
     # try:
     #     if parsers_stat.time1 < 10:
     #
+    elapsed_time = datetime.datetime.now() - trigger.last_time_triggered
+    total_seconds = int(elapsed_time.total_seconds())
 
+    # Convert to hours, minutes, and seconds
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        time_format = f"{hours:02}:{minutes:02}:{seconds:02}"
+    else:
+        time_format = f"{minutes:02}:{seconds:02}"
+    if (trigger.last_time_triggered - trigger.initiated).total_seconds() < 1:
+        time_format = ""
 
     return jsonify(time=now.strftime("%d/%m/%Y, %H:%M:%S"),
                    dsc=dsc,
@@ -142,7 +191,8 @@ def update_index():
                    scope_stat=scope_status,
                    scope_color=int_status_color,
                    parser_status=parsers_stat.status1,
-                   parser_color=parser_color)
+                   parser_color=parser_color,
+                   since_last_shot=time_format)
 
 
 @app.route('/arm_diagnostics')
@@ -204,7 +254,11 @@ def find_images_by_time(folder_number, time_input):
                     # Check for the folder with the most frames
                     if len(times) > max_frames:
                         max_frames = len(times)
-                        first_frame_time = times[0]
+                        try:
+                            first_frame_time = times[1]
+                        except IndexError:
+                            first_frame_time = times[0]
+                            continue
 
     # No valid frames
     if first_frame_time is None:
@@ -268,7 +322,11 @@ def update_diagnostics(dsc=0, n=0, time_exp=5):
     current_folders.update_folders(dsc, n)
     current_experiment.exp_number = n
     current_experiment.discharge = dsc
-    current_experiment.armed = True
+    if current_experiment.armed:
+        print(f'The experiment {n} was armed before, staying here, keeping the ')
+        return
+    else:
+        current_experiment.armed = True
 
     for scope in scopes:
         scope.reset()
@@ -283,7 +341,7 @@ def update_diagnostics(dsc=0, n=0, time_exp=5):
 
     for working_usb_cam_n in working_cameras:
         working_usb_cam_n.triggered = False
-        working_usb_cam_n.time_to_record = time_exp + 2
+        working_usb_cam_n.time_to_record = time_exp + 1
         working_usb_cam_n.setup_worker(current_folders)
         working_usb_cam_n.running_worker.start()
         print(f"Camera {working_usb_cam_n.path} started ")
@@ -496,7 +554,194 @@ def serve_generated_image(filename):
     return send_from_directory(base_dir, filename)
 
 
+# def get_spectra_images_for_experiment(exp_number, time_ms):
+#     """
+#     Retrieve image paths for each spectrometer in the specified experiment and time in milliseconds.
+#     """
+#     exp_folder = os.path.join(SPECTRA_BASE_FOLDER, f'CMFX_{int(exp_number):05d}')
+#     raw_folder = SPECTRA_RAW_FOLDER
+#     try:
+#         spectrometer_folders = [f for f in os.listdir(exp_folder) if os.path.isdir(os.path.join(exp_folder, f))]
+#     except FileNotFoundError as e:
+#         print(f"Couldn't find the file - {e}")
+#         return []
+#     all_images = []
+#
+#     for spectrometer_fld in spectrometer_folders:
+#         spectrometer_folder = os.path.join(exp_folder, spectrometer_fld)
+#         # csv_file = os.path.join(raw_folder, f'CMFX_{int(exp_number):5d}_{spectrometer_fld}_times.csv')
+#         csv_file = os.path.join(raw_folder, f'CMFX_{int(exp_number):05d}_{spectrometer_fld}_times.csv')
+#
+#         # Read times from CSV
+#         try:
+#             times_df = pd.read_csv(csv_file, header=None)
+#             times = pd.to_datetime(times_df.iloc[2:].values.flatten())
+#         except Exception as e:
+#             print(f"Error reading times file {csv_file}: {e}")
+#             continue
+#         # print(f"Times {times}")
+#         # Find the nearest frame to the given time
+#         frame_times = [(times[i]-times[1]).total_seconds() * 1000 for i in range(len(times))]
+#
+#         def extract_frame_number(filename):
+#             match = re.search(r'frame(\d+)\.png', filename)
+#             return int(match.group(1)) if match else -1
+#
+#         images = sorted([f for f in os.listdir(spectrometer_folder) if f.endswith('.png')], key=extract_frame_number)
+#
+#         # images = sorted([f for f in os.listdir(spectrometer_folder) if f.endswith('.png')])
+#
+#         print(frame_times)
+#         print(images)
+#         # Select image based on the time
+#         selected_image = None
+#         for image in images:
+#             image_time = frame_times[images.index(image)]
+#             if image_time >= time_ms:
+#                 selected_image = image
+#                 break
+#
+#         if selected_image:
+#             all_images.append({
+#                 'spectrometer': spectrometer_fld,
+#                 'image': selected_image,
+#                 'image_path': os.path.join(spectrometer_fld, selected_image)
+#             })
+#
+#     return all_images
+def get_spectra_images_for_experiment(exp_number, time_ms):
+    """
+    Retrieve image paths for each spectrometer in the specified experiment and time in milliseconds.
+    """
+    exp_folder = os.path.join(SPECTRA_BASE_FOLDER, f'CMFX_{int(exp_number):05d}')
+    raw_folder = SPECTRA_RAW_FOLDER
+
+    if not os.path.exists(exp_folder):
+        print(f"Experiment folder not found: {exp_folder}")
+        return []
+
+    spectrometer_folders = [f for f in os.listdir(exp_folder) if os.path.isdir(os.path.join(exp_folder, f))]
+    all_images = []
+
+    for spectrometer_i in spectrometer_folders:
+        spectrometer_folder = os.path.join(exp_folder, spectrometer_i)
+        csv_file = os.path.join(raw_folder, f'CMFX_{int(exp_number):05d}_{spectrometer_i}_times.csv')
+
+        # Read times from CSV
+        try:
+            times_df = pd.read_csv(csv_file, header=None)
+            times = pd.to_datetime(times_df.iloc[2:].values.flatten())
+        except Exception as e:
+            print(f"Error reading times file {csv_file}: {e}")
+            continue
+
+        # Convert times to milliseconds
+        frame_times = [(times[i] - times[1]).total_seconds() * 1000 for i in range(len(times))]
+
+        # Sort images numerically based on the frame number in filename
+        def extract_frame_number(filename):
+            match = re.search(r'frame(\d+)\.png', filename)
+            return int(match.group(1)) if match else -1
+
+        images = sorted([f for f in os.listdir(spectrometer_folder) if f.endswith('.png')], key=extract_frame_number)
+        print(f"Times {frame_times}")
+        print(f"Imgs {images}")
+        print(f"time_ms {time_ms}")
+        # Select image based on the time
+        selected_image = None
+        for image in images:
+            image_time = frame_times[images.index(image)]
+            if image_time >= time_ms:
+                selected_image = image
+                break
+        print(f"selected {selected_image}")
+        if selected_image:
+            all_images.append({
+                'spectrometer': spectrometer_i,
+                'image': selected_image,
+                'image_path': os.path.join(spectrometer_i, selected_image)
+            })
+
+    return all_images
+
+
+@app.route('/spectrograms/<exp_number>/<spectrometer>/<filename>')
+def serve_spectra_image(exp_number, spectrometer, filename):
+    """
+    Serve spectrogram images from their actual location.
+    """
+    file_path = os.path.join(SPECTRA_BASE_FOLDER, f'CMFX_{int(exp_number):05d}', spectrometer, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    else:
+        return "File not found", 404
+
+
+@app.route('/spectra', methods=['GET'])
+def display_spectra_images():
+    exp_number = request.args.get('exp_number', '1370')
+    time_ms = request.args.get('time_ms', '0')
+
+    try:
+        exp_number = int(exp_number)
+        time_ms = float(time_ms)
+    except ValueError:
+        return "Invalid input", 400
+
+    images = get_spectra_images_for_experiment(exp_number, time_ms)
+
+    return render_template('spectra.html', images=images, exp_number=exp_number, time_ms=time_ms)
+
+
+@app.route('/spectra', methods=['GET', 'POST'])
+def spectra_view():
+    exp_number = '1370'  # Default experiment number
+    time_ms = 0  # Default time
+
+    if request.method == 'POST':
+        print("HELLO")
+        exp_number = request.form.get('exp_number', exp_number, type=int)
+        time_ms = int(request.form.get('time_ms', time_ms))
+        print(f"REQUESTED TIME {time_ms}")
+        print(f"REQUESTED EXP {exp_number}")
+    images = get_spectra_images_for_experiment(exp_number, time_ms)
+    return render_template('spectra.html', exp_number=exp_number, time_ms=time_ms, images=images)
+
+
+def find_next_available_number(folder_path):
+    # Pattern to match subfolders with format CMFX_XXXXX
+    pattern = re.compile(r'^CMFX_(\d{5})$')
+    existing_numbers = []
+
+    # Iterate through items in the folder
+    for item in os.listdir(folder_path):
+        if os.path.isdir(os.path.join(folder_path, item)):
+            match = pattern.match(item)
+            if match:
+                # Extract the numeric part as an integer
+                number = int(match.group(1))
+                existing_numbers.append(number)
+
+    # Sort numbers and find the first gap
+    existing_numbers.sort()
+    next_number = 1  # Start looking from 00001
+
+    for num in existing_numbers:
+        if num != next_number:
+            return next_number
+        next_number += 1
+
+    # If no gaps, return the next number after the largest found
+    return next_number
+    # return f"{next_number:05d}"
+
+
 if __name__ == "__main__":
+
+    folder_path1 = "/CMFX_RAW/tests/video"
+    next_available = find_next_available_number(folder_path1)
+    # print("Next available number:", next_available)
+
 
     print('Started program')
     index_data = IndexData()
@@ -524,8 +769,8 @@ if __name__ == "__main__":
     scope_DHO4204 = Oscilloscope()
     scopes = [scope_DHO4204]
     
-    usb_spec2000 = USB_spectrometer(integ_time=53000, max_time=6)
-    usb_specSR2 =  USB_spectrometer(integ_time=50000, serial="SR200584", max_time=6)
+    usb_spec2000 = USB_spectrometer(integ_time=200000, max_time=3)
+    usb_specSR2 =  USB_spectrometer(integ_time=200000, serial="SR200584", max_time=3)
 
 
     # spectrometers = []
@@ -590,7 +835,12 @@ if __name__ == "__main__":
     print(f"It took {(time_after_cams - time_before_cams).total_seconds()} s to initiate the cams")
 
     # here we arm the app to gather the data
-    update_diagnostics(dsc=0, n=312, time_exp=6)
+    try:
+        n_next = int(next_available)
+    except ValueError:
+        n_next = 37
+        
+    # update_diagnostics(dsc=0, n=n_next, time_exp=2)
 
     print(f"The app is fully ready!!!!!")
     while True:

@@ -54,17 +54,37 @@
     </style>
   </head>
   <body>
-    <h1>Frame Viewer</h1>
+<!--    <h1>Frame Viewer</h1>-->
 
-    <form method="POST">
-      <label for="folder_number">Enter Experiment Number:</label>
-      <input type="text" id="folder_number" name="folder_number" value="{{ folder_number }}">
+<!--    <form method="POST">-->
+<!--      <label for="folder_number">Enter Experiment Number:</label>-->
+<!--      <input type="text" id="folder_number" name="folder_number" value="{{ folder_number }}">-->
 
-      <label for="time_input">Enter Time in Milliseconds since HVE:</label>
-      <input type="number" id="time_input" name="time_input" value="{{ time_input }}">
+<!--      <label for="time_input">Enter Time in Milliseconds since HVE:</label>-->
+<!--      <input type="number" id="time_input" name="time_input" value="{{ time_input }}">-->
 
-      <button type="submit">Load Frames</button>
-    </form>
+<!--      <button type="submit">Load Frames</button>-->
+<!--    </form>-->
+     <form method="POST">
+  <label for="folder_number">Enter Experiment Number:</label>
+  <input type="text" id="folder_number" name="folder_number" value="{{ folder_number }}">
+
+  <label for="time_input">Enter Time in Milliseconds since HVE:</label>
+  <input type="number" id="time_input" name="time_input" value="{{ time_input }}">
+
+  <button type="submit">Load Frames</button>
+
+  <!-- Time adjustment buttons -->
+  <button type="submit" name="subtract_100">-100</button>
+  <button type="submit" name="subtract_30">-30</button>
+  <button type="submit" name="subtract_4">-4</button>
+  <button type="submit" name="subtract_1">-1</button>
+  <button type="submit" name="add_1">+1</button>
+  <button type="submit" name="add_4">+4</button>
+  <button type="submit" name="add_30">+30</button>
+  <button type="submit" name="add_100">+100</button>
+</form>
+
 
     <div class="grid">
       {% for image in image_data %}
@@ -74,9 +94,12 @@
         </div>
       {% endfor %}
     </div>
-  <p><a href="/data">Home</a></p>
-    <p><a href="/data">Data</a></p>
-<!--    <p><a href="/video">Video</a></p>-->
-    <p><a href="/cam_list">Cameras</a></p>
+
+<p><a href="/">Home</a></p>
+<p><a href="/data">Data</a></p>
+<p><a href="/video">Video</a></p>
+<p><a href="/cam_list">Cameras</a></p>
+<p><a href="/intensities">Intensities</a></p>
+<p><a href="/spectra">Spectrometers</a></p>
   </body>
 </html>

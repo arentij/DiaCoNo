@@ -23,6 +23,7 @@
             $("#exp_n_box").text(data.N_exp);
             $("#scope_status_box").text(data.scope_stat);
             $("#int_file_box").text(data.int_fname);
+            $("#since_shot").text(data.since_last_shot);
             $("#scope_status_box").css("color", data.scope_color);
             $("#parser_status_box").text(data.parser_status);
             $("#parser_status_box").css("color", data.parser_color);
@@ -49,16 +50,20 @@
 
 <body onload="StartUpdating();">
 Time: <span id=time_box>0</span>  <br>
+Since last shot: <span id=since_shot>0</span>  <br>
 Exp Number: <span id=exp_n_box>0</span> <br>
 <!--Interferometer Status <span id=int_status_box>0</span> <br>-->
 Status: <span id=scope_status_box> </span> <br>
 Parser: <span id=parser_status_box> </span> <br>
 
 <br>
+
+<p><a href="/">Home</a></p>
 <p><a href="/data">Data</a></p>
 <p><a href="/video">Video</a></p>
 <p><a href="/cam_list">Cameras</a></p>
 <p><a href="/intensities">Intensities</a></p>
+<p><a href="/spectra">Spectrometers</a></p>
 <!--Int File: <span id=int_file_box> </span> <br>-->
 
 <!--<div class="column">-->

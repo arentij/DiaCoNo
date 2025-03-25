@@ -76,6 +76,8 @@ def process_images(experiment_number):
 
     if not os.path.exists(base_dir):
         os.makedirs(base_dir)
+    else:
+        return None
 
     for subfolder in range(23):
         raw_subfolder = os.path.join(raw_dir, f'video{subfolder}')
@@ -112,19 +114,20 @@ def process_images(experiment_number):
                             reference_time = timestamps[1]
                             time_diff = (frame_time - reference_time).total_seconds() * 1000  # Convert to milliseconds
                             times_ms.append(time_diff)
-
-            # now making the png with intensities
-            plt.figure(figsize=(10, 6))
-            plt.plot(times_ms[1:], total_signals[1:], marker='o')
-            plt.xlabel('Time (ms) After Second Frame')
-            plt.ylabel('Total Signal')
-            plt.title(f'CMFX_{experiment_number:05d} - video{subfolder}')
-            plt.grid(True)
-            plot_file = os.path.join(base_dir, f'video{subfolder}.png')
-            plt.savefig(plot_file)
-            # plt.show()
-            plt.close()
-
+            try:
+                # now making the png with intensities
+                plt.figure(figsize=(10, 6))
+                plt.plot(times_ms[1:], total_signals[1:], marker='o')
+                plt.xlabel('Time (ms) After Second Frame')
+                plt.ylabel('Total Signal')
+                plt.title(f'CMFX_{experiment_number:05d} - video{subfolder}')
+                plt.grid(True)
+                plot_file = os.path.join(base_dir, f'video{subfolder}.png')
+                plt.savefig(plot_file)
+                # plt.show()
+                plt.close()
+            except Exception:
+                print(f"Something went bad during plotting but whatever")
 
 def monitor_and_process():
     """Monitor the /CMFX_RAW/video directory and process existing and new subfolders starting from the largest number."""
@@ -136,13 +139,18 @@ def monitor_and_process():
 
     # Sort experiment numbers in descending order
     experiment_numbers.sort(reverse=True)
-
+    cutoff_n = 800
     # Process existing folders
     for experiment_number in experiment_numbers:
         base_dir = f'{PROCESSED_DIR}/CMFX_{experiment_number:05d}'
         if not os.path.exists(base_dir):
-            print(f"Processing existing experiment: {experiment_number}")
-            process_images(experiment_number)
+
+            if experiment_number > cutoff_n:
+                print(f"Processing existing experiment: {experiment_number}")
+                process_images(experiment_number)
+            processed_experiments.add(experiment_number)
+        else:
+            print(f"This one exists already {base_dir}")
             processed_experiments.add(experiment_number)
 
     while True:
@@ -150,15 +158,19 @@ def monitor_and_process():
         for folder_name in os.listdir(RAW_DIR):
             if is_valid_experiment_folder(folder_name):
                 experiment_number = int(folder_name.replace('CMFX_', ''))
-                current_experiments.add(experiment_number)
+                if experiment_number > cutoff_n:
+                    current_experiments.add(experiment_number)
 
         new_experiments = current_experiments - processed_experiments
         for experiment_number in new_experiments:
-            print(f"Processing new experiment: {experiment_number}")
-            process_images(experiment_number)
-            processed_experiments.add(experiment_number)
-
-        time.sleep(60)  # Wait for one minute before checking again
+            if experiment_number > cutoff_n:
+                print(f"Processing new experiment: {experiment_number}, but waiting 60 s")
+                time.sleep(60)
+                process_images(experiment_number)
+                processed_experiments.add(experiment_number)
+        print(f"Waiting for more data, GIMME MOAR!!!")
+        
+        time.sleep(10)  # Wait for one minute before checking again
 
 
 if __name__ == '__main__':

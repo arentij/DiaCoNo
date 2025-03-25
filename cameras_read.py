@@ -267,11 +267,40 @@ class Camera:
         time.sleep(time_to_wait_to_write)
         output_file = f"{self.current_folders.video_folder}{self.path[5:]}.avi"
         print(output_file)
+
+        zero_time = self.frames_times[1]
+
         out = cv2.VideoWriter(output_file, fourcc, self.fps, self.resolution)
 
-        for frame in self.frames:
-            # cv2.imshow('frame', frame)
-            out.write(frame)
+        # for frame in self.frames:
+        #     # cv2.imshow('frame', frame)
+        #     frame2 = frame
+        #
+        #     out.write(frame2)
+        for idx, frame in enumerate(self.frames):
+            try:
+                frame_copy = frame.copy()
+            except AttributeError as e:
+                print(f"Attribute error on camera ")
+                frame_copy = frame
+                continue
+            # Calculate the time difference in milliseconds
+            time_diff = (self.frames_times[idx] - zero_time).total_seconds() * 1000  # Time difference in milliseconds
+
+            # Format the time difference as a string with one decimal place
+            time_text = f"{time_diff:.1f}"
+
+            margin = 5  # Adjust if necessary
+            text_size = cv2.getTextSize(time_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]  # Get text width and height
+            position = (frame_copy.shape[1] - text_size[0] - margin, text_size[1] + margin)
+
+            # Add the text to the frame
+            cv2.putText(frame_copy, time_text, position, cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 255), 1)
+
+            # Write the frame with the overlay
+            out.write(frame_copy)
+
+        out.release()
 
         count = 0
         if True:
@@ -319,7 +348,7 @@ class Camera:
         #         and done writing
         self.triggered = False
 
-        out.release()
+
         self.frames = []
         self.frames_times = []
         self.intensities = []
